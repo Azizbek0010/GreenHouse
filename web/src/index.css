@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Light theme variables ── */
+:root {
+  --c-primary:    #2c5282;
+  --c-primary-dk: #1e3a5f;
+  --c-green:      #1a8a4e;
+  --c-red:        #d33030;
+  --c-orange:     #c2700a;
+  --c-gray:       #8a8f98;
+  --c-separator:  #ececf0;
+  --c-border:     #e4e6ea;
+  --c-bg:         #f4f5f7;
+  --c-card:       #ffffff;
+  --c-text:       #16191d;
+  --c-text-sub:   #6b7077;
+  --c-green-bg:   #e7f4ec;
+  --c-red-bg:     #fcebeb;
+  --c-orange-bg:  #faf1e2;
+  --c-blue-bg:    #ebf1f7;
+}
+
+/* ── Dark theme variables ── */
+.dark {
+  --c-primary:    #4a7fc1;
+  --c-primary-dk: #3a6aa8;
+  --c-green:      #22c55e;
+  --c-red:        #f87171;
+  --c-orange:     #fb923c;
+  --c-gray:       #9ca3af;
+  --c-separator:  #2d3748;
+  --c-border:     #374151;
+  --c-bg:         #111827;
+  --c-card:       #1f2937;
+  --c-text:       #f9fafb;
+  --c-text-sub:   #9ca3af;
+  --c-green-bg:   #052e16;
+  --c-red-bg:     #2d0a0a;
+  --c-orange-bg:  #431407;
+  --c-blue-bg:    #0c1a2e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--c-bg);
+  color: var(--c-text);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }

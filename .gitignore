@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.docker
+backend/uploads/
+*/uploads/
+dist/
+.DS_Store
+*.log
+mobile/

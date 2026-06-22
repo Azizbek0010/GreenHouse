@@ -1,0 +1,57 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - uploads:/var/www/uploads:ro
+    depends_on:
+      - auth
+      - partiya
+      - sotuv
+      - atxod
+      - stats
+      - notify
+    restart: unless-stopped
+
+  auth:
+    build: ./services/auth
+    env_file: .env.docker
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  partiya:
+    build: ./services/partiya
+    env_file: .env.docker
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  sotuv:
+    build: ./services/sotuv
+    env_file: .env.docker
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  atxod:
+    build: ./services/atxod
+    env_file: .env.docker
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  stats:
+    build: ./services/stats
+    env_file: .env.docker
+    restart: unless-stopped
+
+  notify:
+    build: ./services/notify
+    env_file: .env.docker
+    restart: unless-stopped
+
+volumes:
+  uploads:
