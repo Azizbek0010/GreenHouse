@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, CheckCircle, AlertCircle, ImageOff } from 'lucide-react'
+import { ArrowLeft, Clock, CheckCircle, AlertCircle, ImageOff, X, ShieldCheck } from 'lucide-react'
 import { api } from '../../lib/api'
 import { API_URL } from '../../lib/config'
 import { Badge, Spinner, ErrorMsg } from '../../components/ui'
 
+function PhotoModal({ src, onClose }) {
+  if (!src) return null
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+      onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white">
+        <X size={28} />
+      </button>
+      <img src={src} className="max-w-full max-h-full object-contain rounded-xl"
+        onClick={e => e.stopPropagation()} alt="" />
+    </div>
+  )
+}
+
+function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 function buildRows(sent = [], received = []) {
   const map = new Map()
   const key = (t, s) => `${t}|${s}`
@@ -20,7 +35,7 @@ function buildRows(sent = [], received = []) {
     .sort((a, b) => a.type.localeCompare(b.type) || a.sm - b.sm)
 }
 
-function SafeImg({ src, alt = '', className }) {
+function SafeImg({ src, alt = '', className, onClick }) {
   const [err, setErr] = useState(false)
   if (!src || err) {
     return (
@@ -35,6 +50,7 @@ function SafeImg({ src, alt = '', className }) {
       src={src.startsWith('http') ? src : `${API_URL}${src}`}
       alt={alt}
       className={className}
+      onClick={onClick}
       onError={() => setErr(true)}
     />
   )
@@ -46,6 +62,25 @@ export default function FarqDetail() {
   const [p, setP]             = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
+  const [modalSrc, setModalSrc] = useState(null)
+  const [confirming, setConfirming] = useState(false)
+
+  async function handleConfirm() {
+    setConfirming(true)
+    try {
+      const updated = await api.patch(`/api/partiya/${id}/confirm-farq`)
+      setP(updated)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  function fullSrc(src) {
+    if (!src) return null
+    return src.startsWith('http') ? src : `${API_URL}${src}`
+  }
 
   useEffect(() => {
     api.get(`/api/partiya/${id}`)
@@ -69,7 +104,7 @@ export default function FarqDetail() {
       {loading ? <Spinner /> : (
         <>
           <div className="flex items-center justify-between mb-5">
-            <h1 className="text-2xl font-bold text-ctext tracking-tight">{p?.batchId || 'Partiya'}</h1>
+            <h1 className="text-2xl font-bold text-ctext tracking-tight">{formatBatchId(p?.batchId || 'Partiya')}</h1>
             {p && <Badge status={p.status} />}
           </div>
 
@@ -138,22 +173,55 @@ export default function FarqDetail() {
                   }
                 </span>
               </div>
+
+              {/* Подтверждение farq — только если статус farq_bor */}
+              {p?.status === 'farq_bor' && (
+                <button
+                  onClick={handleConfirm}
+                  disabled={confirming}
+                  className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 mt-4"
+                >
+                  <ShieldCheck size={18} />
+                  {confirming ? 'Tasdiqlanmoqda...' : 'Farqni tasdiqlash'}
+                </button>
+              )}
             </>
           )}
 
-          {/* Kassa photo */}
-          {p?.photo && (
+          {/* Оба фото */}
+          {(p?.sentPhoto || p?.photo) && (
             <div className="mt-5">
-              <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
-                Kassa yuklagan rasm
-              </p>
-              <SafeImg
-                src={p.photo}
-                alt="Kassa rasm"
-                className="w-full h-56 object-cover rounded-2xl"
-              />
+              <div className={`grid gap-4 ${p?.sentPhoto && p?.photo ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                {p?.sentPhoto && (
+                  <div>
+                    <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
+                      Teplitsa yubordi
+                    </p>
+                    <SafeImg
+                      src={p.sentPhoto}
+                      alt="Teplitsa rasm"
+                      className="w-full h-52 object-cover rounded-2xl cursor-zoom-in"
+                      onClick={() => setModalSrc(fullSrc(p.sentPhoto))}
+                    />
+                  </div>
+                )}
+                {p?.photo && (
+                  <div>
+                    <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
+                      Kassa qabul qildi
+                    </p>
+                    <SafeImg
+                      src={p.photo}
+                      alt="Kassa rasm"
+                      className="w-full h-52 object-cover rounded-2xl cursor-zoom-in"
+                      onClick={() => setModalSrc(fullSrc(p.photo))}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
+          <PhotoModal src={modalSrc} onClose={() => setModalSrc(null)} />
         </>
       )}
     </div>

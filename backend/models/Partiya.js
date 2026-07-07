@@ -24,9 +24,24 @@ const partiyaSchema = new mongoose.Schema({
 
 partiyaSchema.pre('save', async function () {
   if (!this.batchId) {
-    const count = await mongoose.model('Partiya').countDocuments()
-    this.batchId = `BATCH-${String(count + 1).padStart(3, '0')}`
+    const UZ_MONTHS = ['yan','fev','mar','apr','may','iyun','iyul','avg','sen','okt','noy','dek']
+    const now   = new Date()
+    const day   = now.getDate()
+    const month = UZ_MONTHS[now.getMonth()]
+
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+    const todayCount = await mongoose.model('Partiya').countDocuments({
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    })
+
+    this.batchId = `${day}-${month}. PARTIYA-${todayCount + 1}`
   }
 })
+
+partiyaSchema.index({ teplitsa: 1, createdAt: -1 })
+partiyaSchema.index({ kassa: 1, createdAt: -1 })
+partiyaSchema.index({ status: 1, createdAt: -1 })
 
 module.exports = mongoose.model('Partiya', partiyaSchema)

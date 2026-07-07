@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../lib/auth'
-import { useTheme } from '../lib/theme'
 
 function formatPhone(d) {
   const parts = []
@@ -16,7 +15,6 @@ function formatPhone(d) {
 export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const { dark, toggle } = useTheme()
   const [phone, setPhone]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -45,15 +43,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-cbg flex items-center justify-center px-4">
-      {/* Theme toggle */}
-      <button
-        onClick={toggle}
-        className="fixed top-4 right-4 w-9 h-9 rounded-xl bg-ccard border border-cborder flex items-center justify-center text-text-sub hover:text-ctext transition-colors"
-      >
-        {dark ? '☀️' : '🌙'}
-      </button>
-
-
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">

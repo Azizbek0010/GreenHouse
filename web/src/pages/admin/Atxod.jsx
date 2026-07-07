@@ -11,7 +11,38 @@ const FILTERS = [
 const SABAB_LABEL = {
   "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Singan', boshqa: 'Boshqa',
 }
+
+const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
+function soat(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+function dateKey(d) {
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
+}
+function dateLabel(d) {
+  const dt = new Date(d)
+  const today = new Date()
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
+  if (dateKey(dt) === dateKey(today))     return 'Bugun'
+  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
+  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
+}
+function groupByDate(items) {
+  const groups = []
+  const seen = {}
+  for (const item of items) {
+    const key = dateKey(item.createdAt)
+    if (!seen[key]) {
+      seen[key] = { label: dateLabel(item.createdAt), items: [] }
+      groups.push(seen[key])
+    }
+    seen[key].items.push(item)
+  }
+  return groups
+}
 
 export default function AdminAtxod() {
   const [filter, setFilter]   = useState('pending')
@@ -56,7 +87,7 @@ export default function AdminAtxod() {
         </button>
       </div>
 
-      {/* ── Filter chips ── */}
+      {/* Filter chips */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {FILTERS.map(f => {
           const c      = list.filter(a => a.status === f.key).length
@@ -73,9 +104,7 @@ export default function AdminAtxod() {
             >
               {f.label}
               <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold flex items-center justify-center ${
-                active
-                  ? 'bg-white/20 text-white'
-                  : 'bg-cbg text-text-sub'
+                active ? 'bg-white/20 text-white' : 'bg-cbg text-text-sub'
               }`}>
                 {c}
               </span>
@@ -95,52 +124,61 @@ export default function AdminAtxod() {
       {loading ? <Spinner /> : shown.length === 0 ? (
         <EmptyState text="Bu bo'limda atxod yo'q" />
       ) : (
-        <div className="space-y-3">
-          {shown.map(a => (
-            <div key={a._id} className="bg-ccard border border-cborder rounded-2xl overflow-hidden">
-              {/* Photo */}
-              <SafeImg src={a.photo} className="w-full h-48" />
+        <div>
+          {groupByDate(shown).map(group => (
+            <div key={group.label}>
+              <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">
+                {group.label}
+              </p>
+              <div className="space-y-3">
+                {group.items.map(a => (
+                  <div key={a._id} className="bg-ccard border border-cborder rounded-2xl overflow-hidden">
+                    <SafeImg src={a.photo} className="w-full h-48" />
 
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-base font-semibold text-ctext">
-                    {a.flowerType} {a.razmer}sm
-                  </p>
-                  <Badge status={a.status} />
-                </div>
-                <p className="text-sm text-text-sub">
-                  {a.qty} ta · {SABAB_LABEL[a.sabab] || a.sabab} · {a.kassa?.name || 'Kassa'}
-                </p>
-                {a.qiymat > 0 && (
-                  <p className="text-sm text-text-sub mt-0.5">
-                    Qiymati: {money(a.qiymat * a.qty)} s
-                  </p>
-                )}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-base font-semibold text-ctext">
+                          {a.flowerType} {a.razmer}sm
+                        </p>
+                        <Badge status={a.status} />
+                      </div>
+                      <p className="text-sm text-text-sub">
+                        {a.qty} ta · {SABAB_LABEL[a.sabab] || a.sabab} · {a.kassa?.name || 'Kassa'}
+                      </p>
+                      {a.qiymat > 0 && (
+                        <p className="text-sm text-text-sub mt-0.5">
+                          Qiymati: {money(a.qiymat * a.qty)} s
+                        </p>
+                      )}
+                      <p className="text-xs text-[#9aa0a8] mt-1">{soat(a.createdAt)}</p>
 
-                {a.status === 'pending' && (
-                  <div className="flex gap-3 mt-4">
-                    <button
-                      onClick={() => review(a._id, 'rejected')}
-                      disabled={busyId === a._id}
-                      className="flex-1 h-11 rounded-xl border border-cred text-cred text-sm font-semibold flex items-center justify-center gap-2 hover:bg-red-bg transition-colors disabled:opacity-60"
-                    >
-                      {busyId === a._id
-                        ? <span className="w-4 h-4 border-2 border-cred border-t-transparent rounded-full animate-spin" />
-                        : <><X size={16} />Rad etish</>
-                      }
-                    </button>
-                    <button
-                      onClick={() => review(a._id, 'approved')}
-                      disabled={busyId === a._id}
-                      className="flex-1 h-11 rounded-xl bg-cgreen text-white text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
-                    >
-                      {busyId === a._id
-                        ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        : <><Check size={16} />Tasdiqlash</>
-                      }
-                    </button>
+                      {a.status === 'pending' && (
+                        <div className="flex gap-3 mt-4">
+                          <button
+                            onClick={() => review(a._id, 'rejected')}
+                            disabled={busyId === a._id}
+                            className="flex-1 h-11 rounded-xl border border-cred text-cred text-sm font-semibold flex items-center justify-center gap-2 hover:bg-red-bg transition-colors disabled:opacity-60"
+                          >
+                            {busyId === a._id
+                              ? <span className="w-4 h-4 border-2 border-cred border-t-transparent rounded-full animate-spin" />
+                              : <><X size={16} />Rad etish</>
+                            }
+                          </button>
+                          <button
+                            onClick={() => review(a._id, 'approved')}
+                            disabled={busyId === a._id}
+                            className="flex-1 h-11 rounded-xl bg-cgreen text-white text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
+                          >
+                            {busyId === a._id
+                              ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              : <><Check size={16} />Tasdiqlash</>
+                            }
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           ))}

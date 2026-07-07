@@ -3,7 +3,7 @@ const Sotuv = require('../models/Sotuv')
 exports.create = async (req, res, next) => {
   try {
     const { flowerType, razmer, qty, holat, pricePerUnit } = req.body
-    const photo = req.file ? `/uploads/sotuv/${req.file.filename}` : null
+    const photo = req.file ? req.file.path : null
 
     const qtyN = Number(qty), priceN = Number(pricePerUnit), razmerN = Number(razmer)
     if (!flowerType || !Number.isInteger(qtyN) || qtyN <= 0 || !Number.isFinite(priceN) || priceN <= 0 || !Number.isFinite(razmerN) || razmerN <= 0)
@@ -51,6 +51,16 @@ exports.getAll = async (req, res, next) => {
 
     const total = sotuvlar.reduce((s, x) => s + x.totalPrice, 0)
     res.json({ sotuvlar, total })
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getOne = async (req, res, next) => {
+  try {
+    const sotuv = await Sotuv.findById(req.params.id).populate('kassa', 'name')
+    if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
+    res.json(sotuv)
   } catch (err) {
     next(err)
   }

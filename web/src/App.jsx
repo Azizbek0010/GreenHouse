@@ -11,6 +11,8 @@ import AdminSotuvlar   from './pages/admin/Sotuvlar'
 import AdminStatistika from './pages/admin/Statistika'
 import AdminAtxod      from './pages/admin/Atxod'
 import AdminFarq       from './pages/admin/FarqDetail'
+import AdminSotuvDetail from './pages/admin/SotuvDetail'
+import AdminAtxodDetail from './pages/admin/AtxodDetail'
 import AdminUsers      from './pages/admin/Users'
 import AdminSozlamalar from './pages/admin/Sozlamalar'
 import AdminTarix      from './pages/admin/Tarix'
@@ -22,6 +24,7 @@ import TeplitsaTarix    from './pages/teplitsa/Tarix'
 import KassaHome       from './pages/kassa/Home'
 import KassaQabul      from './pages/kassa/Qabul'
 import KassaSotuv      from './pages/kassa/Sotuv'
+import KassaQarzSotuv  from './pages/kassa/QarzSotuv'
 import KassaAtxod      from './pages/kassa/Atxod'
 import KassaTarix      from './pages/kassa/Tarix'
 
@@ -63,8 +66,10 @@ export default function App() {
             <Route path="/admin/sotuvlar"   element={<PrivateRoute role="admin"><AdminSotuvlar /></PrivateRoute>} />
             <Route path="/admin/statistika" element={<PrivateRoute role="admin"><AdminStatistika /></PrivateRoute>} />
             <Route path="/admin/atxod"      element={<PrivateRoute role="admin"><AdminAtxod /></PrivateRoute>} />
-            <Route path="/admin/farq/:id"   element={<PrivateRoute role="admin"><AdminFarq /></PrivateRoute>} />
-            <Route path="/admin/tarix"      element={<PrivateRoute role="admin"><AdminTarix /></PrivateRoute>} />
+            <Route path="/admin/farq/:id"        element={<PrivateRoute role="admin"><AdminFarq /></PrivateRoute>} />
+            <Route path="/admin/sotuv/:id"       element={<PrivateRoute role="admin"><AdminSotuvDetail /></PrivateRoute>} />
+            <Route path="/admin/atxod/:id"       element={<PrivateRoute role="admin"><AdminAtxodDetail /></PrivateRoute>} />
+            <Route path="/admin/tarix"           element={<PrivateRoute role="admin"><AdminTarix /></PrivateRoute>} />
             <Route path="/admin/users"      element={<PrivateRoute role="admin"><AdminUsers /></PrivateRoute>} />
             <Route path="/admin/sozlamalar" element={<PrivateRoute role="admin"><AdminSozlamalar /></PrivateRoute>} />
 
@@ -77,6 +82,7 @@ export default function App() {
             <Route path="/kassa"        element={<PrivateRoute role="kassa"><KassaHome /></PrivateRoute>} />
             <Route path="/kassa/qabul"  element={<PrivateRoute role="kassa"><KassaQabul /></PrivateRoute>} />
             <Route path="/kassa/sotuv"  element={<PrivateRoute role="kassa"><KassaSotuv /></PrivateRoute>} />
+            <Route path="/kassa/qarz"   element={<PrivateRoute role="kassa"><KassaQarzSotuv /></PrivateRoute>} />
             <Route path="/kassa/atxod"  element={<PrivateRoute role="kassa"><KassaAtxod /></PrivateRoute>} />
             <Route path="/kassa/tarix"  element={<PrivateRoute role="kassa"><KassaTarix /></PrivateRoute>} />
 

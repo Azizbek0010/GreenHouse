@@ -4,6 +4,7 @@ import { Package, Flower2, Plus } from 'lucide-react'
 import { api } from '../../lib/api'
 import { StatCard, Badge, PrimaryButton, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
+function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 function summarize(flowers = []) {
   return flowers.map(f => {
     const total = f.sizes.reduce((sum, s) => sum + s.qty, 0)
@@ -80,7 +81,7 @@ export default function TeplitsaHome() {
           {partiyalar.map((p, i) => (
             <div key={p._id} className={`flex items-center gap-3 p-4 ${i > 0 ? 'border-t border-separator' : ''}`}>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ctext">{p.batchId}</p>
+                <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
                 <p className="text-xs text-text-sub mt-0.5">
                   {summarize(p.sent)} → {p.kassa?.name || 'Kassa'}
                 </p>

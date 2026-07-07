@@ -12,4 +12,7 @@ const atxodSchema = new mongoose.Schema({
   adminNote:  { type: String, default: null },
 }, { timestamps: true })
 
+atxodSchema.index({ kassa: 1, createdAt: -1 })
+atxodSchema.index({ status: 1, createdAt: -1 })
+
 module.exports = mongoose.model('Atxod', atxodSchema)

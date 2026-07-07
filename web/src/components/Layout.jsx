@@ -12,11 +12,9 @@ import { API_URL } from '../lib/config'
 const NAV = {
   admin: [
     { to: '/admin',            label: 'Bosh sahifa', icon: LayoutDashboard },
-    { to: '/admin/partiyalar', label: 'Partiyalar',  icon: Package },
-    { to: '/admin/sotuvlar',   label: 'Sotuvlar',    icon: ShoppingCart },
     { to: '/admin/statistika', label: 'Statistika',  icon: BarChart2 },
-    { to: '/admin/atxod',      label: 'Atxod',       icon: Trash2 },
     { to: '/admin/tarix',      label: 'Tarix',       icon: Clock },
+
     { to: '/admin/users',      label: 'Foydalanuvchilar', icon: Users },
     { to: '/admin/sozlamalar', label: 'Sozlamalar',  icon: Settings },
   ],

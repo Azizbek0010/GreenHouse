@@ -93,7 +93,7 @@ exports.updateProfile = async (req, res, next) => {
     }
 
     if (req.file) {
-      user.avatar = `/uploads/avatar/${req.file.filename}`
+      user.avatar = req.file.path
     }
 
     await user.save()

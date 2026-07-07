@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calendar, Flower2, AlertTriangle, ChevronRight } from 'lucide-react'
+import { Flower2, AlertTriangle, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
 import { API_URL } from '../../lib/config'
@@ -13,30 +13,92 @@ const PERIODS = [
   { key: 'jami',     label: 'Jami' },
 ]
 
+const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function summarize(flowers = []) {
   return flowers.map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
+}
+function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
+function dateKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}` }
+function dateLabel(d) {
+  const dt = new Date(d), today = new Date(), yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  if (dateKey(dt) === dateKey(today))     return 'Bugun'
+  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
+  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
+}
+function groupByDate(items) {
+  const groups = [], seen = {}
+  for (const item of items) {
+    const key = dateKey(item.createdAt)
+    if (!seen[key]) { seen[key] = { label: dateLabel(item.createdAt), items: [] }; groups.push(seen[key]) }
+    seen[key].items.push(item)
+  }
+  return groups
 }
 function farqLine(f) {
   const d = f.diff > 0 ? `+${f.diff}` : `${f.diff}`
   return `${f.type} ${f.sm}sm: kutilgan ${f.sent} ta, keldi ${f.received} ta (${d})`
 }
 
-function HomeAvatar({ user }) {
-  const [err, setErr] = useState(false)
-  if (user?.avatar && !err) {
-    return (
-      <img
-        src={`${API_URL}${user.avatar}`}
-        className="w-10 h-10 rounded-full object-cover shrink-0"
-        alt=""
-        onError={() => setErr(true)}
-      />
-    )
-  }
+function imgSrc(src) {
+  if (!src) return null
+  return src.startsWith('http') ? src : `${API_URL}${src}`
+}
+
+function PartiyaCard({ p, onClick }) {
+  const [expanded, setExpanded] = useState(false)
   return (
-    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold shrink-0">
-      {(user?.name || '?').charAt(0).toUpperCase()}
+    <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <button onClick={onClick} className="text-base font-semibold text-ctext hover:text-primary transition-colors text-left">
+            {formatBatchId(p.batchId)}
+          </button>
+          <Badge status={p.status} />
+        </div>
+        <p className="text-sm text-text-sub">{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'}</p>
+        <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
+        <p className="text-xs text-text-sub/60 mt-0.5">{new Date(p.createdAt).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit' })} · {new Date(p.createdAt).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' })}</p>
+
+        {(p.sentPhoto || p.photo) && (
+          <div className={`mt-3 grid gap-2 ${p.sentPhoto && p.photo ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+            {p.sentPhoto && (
+              <div>
+                <p className="text-[10px] font-semibold text-text-sub uppercase tracking-wider mb-1">Teplitsa</p>
+                <img src={imgSrc(p.sentPhoto)} className="w-full h-32 object-cover rounded-xl" alt=""
+                  onError={e => { e.target.style.display = 'none' }} />
+              </div>
+            )}
+            {p.photo && (
+              <div>
+                <p className="text-[10px] font-semibold text-text-sub uppercase tracking-wider mb-1">Kassa</p>
+                <img src={imgSrc(p.photo)} className="w-full h-32 object-cover rounded-xl" alt=""
+                  onError={e => { e.target.style.display = 'none' }} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {p.farq?.length > 0 && (
+          <button onClick={() => setExpanded(v => !v)}
+            className="flex items-center gap-1 text-xs text-cred font-semibold mt-3 hover:underline">
+            {expanded ? <><ChevronUp size={12}/> Yopish</> : <><ChevronDown size={12}/> Farqlar ({p.farq.length})</>}
+          </button>
+        )}
+      </div>
+      {expanded && p.farq?.length > 0 && (
+        <div className="border-t border-separator px-4 py-3 space-y-1.5">
+          {p.farq.map((f, i) => (
+            <div key={i} className="flex items-center justify-between bg-red-bg/40 border border-cred/20 rounded-xl px-3 py-2">
+              <span className="text-xs text-ctext font-medium">{f.type} {f.sm}sm</span>
+              <span className="text-xs text-cred font-semibold">
+                {f.sent} → {f.received} ({f.diff > 0 ? '+' : ''}{f.diff})
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -72,15 +134,6 @@ export default function AdminHome() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      {/* Header — desktop only (mobile uses fixed Layout header) */}
-      <div className="hidden md:flex items-center gap-3 mb-6">
-        <HomeAvatar user={user} />
-        <div>
-          <p className="font-semibold text-ctext">{user?.name}</p>
-          <p className="text-xs text-text-sub">Administrator</p>
-        </div>
-      </div>
-
       {/* Period selector */}
       <div className="flex gap-1 bg-[#e9ebee] dark:bg-gray-800 rounded-xl p-1 mb-5">
         {PERIODS.map(p => (
@@ -138,7 +191,7 @@ export default function AdminHome() {
             >
               <AlertTriangle size={20} className="text-corange shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-ctext">Farq aniqlandi — {farqBatch.batchId}</p>
+                <p className="text-sm font-bold text-ctext">Farq aniqlandi — {formatBatchId(farqBatch.batchId)}</p>
                 <p className="text-xs text-text-sub mt-0.5 truncate">{farqLine(farqBatch.farq[0])}</p>
               </div>
               <ChevronRight size={18} className="text-corange shrink-0" />
@@ -161,24 +214,21 @@ export default function AdminHome() {
           </div>
 
           {/* Last partiyalar */}
-          <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Oxirgi partiyalar</p>
           {partiyalar.length === 0 ? (
             <EmptyState text="Hozircha partiya yo'q" />
           ) : (
-            <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
-              {partiyalar.slice(0, 5).map((p, i) => (
-                <button
-                  key={p._id}
-                  onClick={() => navigate(`/admin/farq/${p._id}`)}
-                  className={`w-full flex items-center gap-3 p-4 text-left hover:bg-cbg transition-colors ${i > 0 ? 'border-t border-separator' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-ctext">{p.batchId}</p>
-                    <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
+            <div>
+              {groupByDate(partiyalar.slice(0, 8)).map((group, gi) => (
+                <div key={group.label}>
+                  <div className={`${gi === 0 ? 'mb-3' : 'mt-6 mb-3'}`}>
+                    <p className="text-xl font-bold text-ctext">{group.label}</p>
                   </div>
-                  <Badge status={p.status} />
-                  <ChevronRight size={16} className="text-cborder" />
-                </button>
+                  <div className="space-y-3">
+                    {group.items.map(p => (
+                      <PartiyaCard key={p._id} p={p} onClick={() => navigate(`/admin/farq/${p._id}`)} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

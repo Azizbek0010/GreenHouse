@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight } from 'lucide-react'
+import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight, HandCoins } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
 import { API_URL } from '../../lib/config'
 import { StatCard, Badge, PrimaryButton, Spinner, ErrorMsg } from '../../components/ui'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
+function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
+function imgSrc(src) { if (!src) return null; return src.startsWith('http') ? src : `${API_URL}${src}` }
+function summarize(flowers = []) {
+  return flowers.map(f => {
+    const total = f.sizes.reduce((s, x) => s + x.qty, 0)
+    return `${f.type} ${total}ta`
+  }).join(', ')
+}
 
 export default function KassaHome() {
   const { user } = useAuth()
@@ -90,7 +98,7 @@ export default function KassaHome() {
                   className={`w-full flex items-center gap-3 p-4 text-left hover:bg-cbg transition-colors ${i > 0 ? 'border-t border-separator' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-ctext">{p.batchId}</p>
+                    <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
                     <p className="text-xs text-text-sub mt-0.5">{p.teplitsa?.name || 'Teplitsa'} yubordi · qabul qiling</p>
                   </div>
                   <Badge status={p.status} />
@@ -112,6 +120,13 @@ export default function KassaHome() {
               icon={<Plus size={18} />}
               onClick={() => navigate('/kassa/sotuv')}
             />
+            <button
+              onClick={() => navigate('/kassa/qarz')}
+              className="flex items-center justify-center gap-2 w-full h-[50px] rounded-xl border-[1.5px] border-primary text-primary bg-ccard font-semibold text-base hover:bg-blue-bg transition-colors"
+            >
+              <HandCoins size={18} />
+              Qarzga sotish
+            </button>
             <button
               onClick={() => navigate('/kassa/atxod')}
               className="flex items-center justify-center gap-2 w-full h-[50px] rounded-xl border-[1.5px] border-corange text-corange bg-ccard font-semibold text-base hover:bg-orange-bg transition-colors"

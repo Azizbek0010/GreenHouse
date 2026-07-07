@@ -4,10 +4,38 @@ import { api } from '../../lib/api'
 import { API_URL } from '../../lib/config'
 import { Spinner, EmptyState, ErrorMsg, Badge, SafeImg } from '../../components/ui'
 
-function fmtDate(d) {
-  const x = new Date(d)
-  return x.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short', year: 'numeric' })
-    + ' ' + x.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+
+function soat(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+function dateKey(d) {
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
+}
+function dateLabel(d) {
+  const dt = new Date(d)
+  const today = new Date()
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
+  if (dateKey(dt) === dateKey(today))     return 'Bugun'
+  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
+  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
+}
+function groupByDate(items) {
+  const groups = []
+  const seen = {}
+  for (const item of items) {
+    const key = dateKey(item.createdAt)
+    if (!seen[key]) {
+      seen[key] = { label: dateLabel(item.createdAt), items: [] }
+      groups.push(seen[key])
+    }
+    seen[key].items.push(item)
+  }
+  return groups
+}
+function formatBatchId(id = '') {
+  return id.replace(/^BATCH-/, 'PARTIYA-')
 }
 
 function FlowerSummary({ sent = [] }) {
@@ -25,12 +53,10 @@ function PartiyaCard({ p }) {
 
   return (
     <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
-      {/* Header */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-3 p-4 text-left"
       >
-        {/* sentPhoto thumbnail */}
         {p.sentPhoto && (
           <img
             src={`${API_URL}${p.sentPhoto}`}
@@ -40,12 +66,12 @@ function PartiyaCard({ p }) {
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-bold text-ctext">{p.batchId}</p>
+            <p className="text-sm font-bold text-ctext">{formatBatchId(p.batchId)}</p>
             <Badge status={p.status} />
           </div>
           <p className="text-xs text-text-sub mt-0.5">{p.kassa?.name || 'Kassa'}</p>
           <FlowerSummary sent={p.sent} />
-          <p className="text-xs text-text-sub/60 mt-1">{fmtDate(p.createdAt)}</p>
+          <p className="text-xs text-text-sub/60 mt-1">{soat(p.createdAt)}</p>
         </div>
         {expanded
           ? <ChevronUp size={16} className="text-text-sub shrink-0" />
@@ -53,13 +79,9 @@ function PartiyaCard({ p }) {
         }
       </button>
 
-      {/* Expanded detail */}
       {expanded && (
         <div className="border-t border-separator">
-          {/* Rasm katta */}
           <SafeImg src={p.sentPhoto} className="w-full max-h-64 object-cover" />
-
-          {/* Gullar */}
           <div className="px-4 py-3">
             <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan gullar</p>
             <div className="space-y-2">
@@ -100,8 +122,8 @@ export default function TeplitsaTarix() {
   useEffect(() => { load() }, [load])
 
   const counts = {
-    yolda:          partiyalar.filter(p => p.status === 'yolda').length,
-    qabul_qilindi:  partiyalar.filter(p => p.status === 'qabul_qilindi').length,
+    yolda:         partiyalar.filter(p => p.status === 'yolda').length,
+    qabul_qilindi: partiyalar.filter(p => p.status === 'qabul_qilindi').length,
   }
 
   return (
@@ -115,7 +137,6 @@ export default function TeplitsaTarix() {
         </div>
       </div>
 
-      {/* Summary chips */}
       {partiyalar.length > 0 && (
         <div className="flex gap-2 mb-5">
           <div className="flex-1 bg-blue-bg border border-primary/20 rounded-xl px-3 py-2.5 text-center">
@@ -137,10 +158,20 @@ export default function TeplitsaTarix() {
 
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
-      {loading ? <Spinner /> : partiyalar.length === 0
-        ? <EmptyState text="Hozircha yuborilgan partiya yo'q" />
-        : partiyalar.map(p => <PartiyaCard key={p._id} p={p} />)
-      }
+      {loading ? <Spinner /> : partiyalar.length === 0 ? (
+        <EmptyState text="Hozircha yuborilgan partiya yo'q" />
+      ) : (
+        <div>
+          {groupByDate(partiyalar).map(group => (
+            <div key={group.label}>
+              <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-3 pb-2 first:pt-0">
+                {group.label}
+              </p>
+              {group.items.map(p => <PartiyaCard key={p._id} p={p} />)}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

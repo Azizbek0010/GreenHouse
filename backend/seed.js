@@ -2,27 +2,23 @@ require('dotenv').config()
 const mongoose = require('mongoose')
 const User = require('./models/User')
 
+const USERS = [
+  { name: 'Admin',   phone: '+998901234567', password: 'admin123',    role: 'admin' },
+  { name: 'Sardor',  phone: '+998901234568', password: 'teplitsa123', role: 'teplitsa' },
+  { name: 'Akbar',   phone: '+998901234569', password: 'kassa123',    role: 'kassa' },
+]
+
 async function seed() {
   await mongoose.connect(process.env.MONGO_URI)
-
-  const users = [
-    { name: 'Admin',   phone: '+998900000001', password: 'admin123',   role: 'admin' },
-    { name: 'Sardor',  phone: '+998900000002', password: 'teplitsa123', role: 'teplitsa' },
-    { name: 'Akbar',   phone: '+998900000003', password: 'kassa123',    role: 'kassa' },
-  ]
-
-  for (const u of users) {
-    const exists = await User.findOne({ phone: u.phone })
-    if (exists) {
-      console.log(`${u.role} (${u.phone}) allaqachon mavjud — o'tkazib yuborildi`)
-      continue
-    }
+  console.log('MongoDB ga ulandi')
+  await User.deleteMany({})
+  console.log('Eski foydalanuvchilar tozalandi')
+  for (const u of USERS) {
     await User.create(u)
-    console.log(`${u.role} yaratildi: ${u.phone} / ${u.password}`)
+    console.log(`OK ${u.role}: ${u.name} (${u.phone}) — parol: ${u.password}`)
   }
-
   await mongoose.disconnect()
-  console.log('Seed tugadi')
+  console.log('Hammasi tayyor!')
 }
 
-seed().catch(err => { console.error(err); process.exit(1) })
+seed().catch(e => { console.error(e); process.exit(1) })

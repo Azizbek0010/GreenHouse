@@ -15,4 +15,7 @@ sotuvSchema.pre('save', function () {
   this.totalPrice = this.pricePerUnit * this.qty
 })
 
+sotuvSchema.index({ kassa: 1, createdAt: -1 })
+sotuvSchema.index({ createdAt: -1 })
+
 module.exports = mongoose.model('Sotuv', sotuvSchema)

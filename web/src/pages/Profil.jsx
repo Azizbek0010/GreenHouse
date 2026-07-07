@@ -32,7 +32,10 @@ function AvatarBlock({ user, onUpload }) {
     finally { setUploading(false) }
   }
 
-  const src = user?.avatar && !imgErr ? `${API_URL}${user.avatar}` : null
+  const av = user?.avatar
+  const src = av && !imgErr
+    ? (av.startsWith('http') ? av : `${API_URL}${av}`)
+    : null
 
   return (
     <div className="flex items-center gap-4 px-4 py-5">

@@ -1,20 +1,27 @@
-const multer = require('multer')
-const path = require('path')
+const multer    = require('multer')
+const cloudinary = require('cloudinary').v2
+const { CloudinaryStorage } = require('multer-storage-cloudinary')
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const folder = req.uploadFolder || 'uploads'
-    cb(null, folder)
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1e9) + ext)
-  },
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key:    process.env.CLOUDINARY_KEY,
+  api_secret: process.env.CLOUDINARY_SECRET,
 })
 
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) cb(null, true)
-  else cb(new Error('Faqat rasm yuklash mumkin'), false)
-}
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: (req) => ({
+    folder:        `greenhouse/${req.uploadFolder || 'misc'}`,
+    resource_type: 'image',
+    transformation: [{ quality: 'auto:good', width: 1200, crop: 'limit' }],
+  }),
+})
 
-module.exports = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } })
+module.exports = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true)
+    else cb(new Error('Faqat rasm yuklash mumkin'), false)
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+})

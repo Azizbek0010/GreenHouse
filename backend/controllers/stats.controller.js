@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Sotuv   = require('../models/Sotuv')
 const Atxod   = require('../models/Atxod')
 const Partiya = require('../models/Partiya')
+const Qarz    = require('../models/Qarz')
 
 function dateRange(period, prev = false) {
   if (period === 'jami') return {}
@@ -29,22 +30,35 @@ function dateRange(period, prev = false) {
   return { $gte: from, $lte: to }
 }
 
-async function calcStats(dateFilter) {
-  const [sotuvAgg, atxodAgg] = await Promise.all([
-    require('../models/Sotuv').aggregate([
-      { $match: dateFilter },
+// cr — sana diapazoni ({ $gte, $lte }) yoki {} (jami)
+async function calcStats(cr, kassaId = null) {
+  const hasRange   = cr && Object.keys(cr).length > 0
+  const sotuvMatch = { ...(hasRange ? { createdAt: cr } : {}), ...(kassaId ? { kassa: kassaId } : {}) }
+  const atxodMatch = { ...(hasRange ? { createdAt: cr } : {}), status: 'approved', ...(kassaId ? { kassa: kassaId } : {}) }
+  // Variant A: qarzdan tushum — to'lov qilingan sana (payments.at) bo'yicha
+  const qarzMatch  = { ...(hasRange ? { 'payments.at': cr } : {}), ...(kassaId ? { kassa: kassaId } : {}) }
+
+  const [sotuvAgg, atxodAgg, qarzAgg] = await Promise.all([
+    Sotuv.aggregate([
+      { $match: sotuvMatch },
       { $group: { _id: null, daromad: { $sum: '$totalPrice' }, sotildi: { $sum: '$qty' } } },
     ]),
-    require('../models/Atxod').aggregate([
-      { $match: { ...dateFilter, status: 'approved' } },
+    Atxod.aggregate([
+      { $match: atxodMatch },
       { $group: { _id: null, qty: { $sum: '$qty' }, yoqotish: { $sum: { $multiply: ['$qiymat','$qty'] } } } },
+    ]),
+    Qarz.aggregate([
+      { $unwind: '$payments' },
+      { $match: qarzMatch },
+      { $group: { _id: null, qarzDaromad: { $sum: '$payments.amount' } } },
     ]),
   ])
   return {
-    daromad:  sotuvAgg[0]?.daromad ?? 0,
-    sotildi:  sotuvAgg[0]?.sotildi ?? 0,
-    yoqotish: atxodAgg[0]?.yoqotish ?? 0,
-    atxodQty: atxodAgg[0]?.qty ?? 0,
+    daromad:      (sotuvAgg[0]?.daromad ?? 0) + (qarzAgg[0]?.qarzDaromad ?? 0),
+    qarzDaromad:  qarzAgg[0]?.qarzDaromad ?? 0,
+    sotildi:      sotuvAgg[0]?.sotildi ?? 0,
+    yoqotish:     atxodAgg[0]?.yoqotish ?? 0,
+    atxodQty:     atxodAgg[0]?.qty ?? 0,
   }
 }
 
@@ -58,8 +72,8 @@ exports.adminStats = async (req, res, next) => {
 
     // Current + previous period basic stats in parallel
     const [cur, prev, byType, atxodBySabab, farqCount, partiyaAgg] = await Promise.all([
-      calcStats(dateFilter),
-      calcStats(prevDateFilter),
+      calcStats(cr),
+      calcStats(prevCr),
       Sotuv.aggregate([
         { $match: dateFilter },
         { $group: { _id: '$flowerType', qty: { $sum: '$qty' }, daromad: { $sum: '$totalPrice' } } },
@@ -113,10 +127,8 @@ exports.kassaStats = async (req, res, next) => {
     // aggregate avtomatik cast qilmaydi — string id ni ObjectId ga o'tkazamiz
     const kassaId = mongoose.Types.ObjectId.createFromHexString(req.user.id)
 
-    const sotuvAgg = await Sotuv.aggregate([
-      { $match: { ...dateFilter, kassa: kassaId } },
-      { $group: { _id: null, daromad: { $sum: '$totalPrice' }, sotildi: { $sum: '$qty' } } },
-    ])
+    // daromad (odi sotuv + qarz to'lovlari) va sotildi — calcStats orqali
+    const cur = await calcStats(createdAt, kassaId)
 
     const atxodAgg = await Atxod.aggregate([
       { $match: { ...dateFilter, kassa: kassaId } },
@@ -125,8 +137,9 @@ exports.kassaStats = async (req, res, next) => {
 
     res.json({
       period,
-      daromad: sotuvAgg[0]?.daromad ?? 0,
-      sotildi: sotuvAgg[0]?.sotildi ?? 0,
+      daromad:     cur.daromad,
+      qarzDaromad: cur.qarzDaromad,
+      sotildi:     cur.sotildi,
       atxod: Object.fromEntries(atxodAgg.map(a => [a._id, a.qty])),
     })
   } catch (err) {

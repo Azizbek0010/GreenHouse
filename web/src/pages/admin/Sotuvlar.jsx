@@ -3,9 +3,37 @@ import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
+const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
-function fmt(d) {
-  return new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+function soat(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+function dateKey(d) {
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
+}
+function dateLabel(d) {
+  const dt = new Date(d)
+  const today = new Date()
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
+  if (dateKey(dt) === dateKey(today))     return 'Bugun'
+  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
+  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
+}
+function groupByDate(items) {
+  const groups = []
+  const seen = {}
+  for (const item of items) {
+    const key = dateKey(item.createdAt)
+    if (!seen[key]) {
+      seen[key] = { label: dateLabel(item.createdAt), items: [], total: 0 }
+      groups.push(seen[key])
+    }
+    seen[key].items.push(item)
+    seen[key].total += item.totalPrice || 0
+  }
+  return groups
 }
 
 export default function AdminSotuvlar() {
@@ -49,22 +77,32 @@ export default function AdminSotuvlar() {
       {loading ? <Spinner /> : sotuvlar.length === 0 ? (
         <EmptyState text="Hozircha sotuv yo'q" />
       ) : (
-        <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
-          {sotuvlar.map((sv, i) => (
-            <div key={sv._id} className={`flex items-center gap-3 p-4 ${i > 0 ? 'border-t border-separator' : ''}`}>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ctext">
-                  {sv.flowerType} {sv.razmer}sm
-                  {sv.holat === 'nuqsonli' && <span className="text-corange font-normal text-xs ml-2">· Nuqsonli</span>}
-                </p>
-                <p className="text-xs text-text-sub mt-0.5">
-                  {sv.qty} ta × {money(sv.pricePerUnit)} · {sv.kassa?.name || 'Kassa'}
-                </p>
-                <p className="text-xs text-[#9aa0a8] mt-0.5">{fmt(sv.createdAt)}</p>
+        <div>
+          {groupByDate(sotuvlar).map(group => (
+            <div key={group.label}>
+              <div className="flex items-center justify-between px-1 pt-4 pb-2 first:pt-0">
+                <p className="text-xs font-bold text-text-sub uppercase tracking-wider">{group.label}</p>
+                <p className="text-xs font-semibold text-cgreen">{money(group.total)} s</p>
               </div>
-              <p className={`text-sm font-bold shrink-0 ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
-                {money(sv.totalPrice)} s
-              </p>
+              <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
+                {group.items.map((sv, i) => (
+                  <div key={sv._id} className={`flex items-center gap-3 p-4 ${i > 0 ? 'border-t border-separator' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ctext">
+                        {sv.flowerType} {sv.razmer}sm
+                        {sv.holat === 'nuqsonli' && <span className="text-corange font-normal text-xs ml-2">· Nuqsonli</span>}
+                      </p>
+                      <p className="text-xs text-text-sub mt-0.5">
+                        {sv.qty} ta × {money(sv.pricePerUnit)} · {sv.kassa?.name || 'Kassa'}
+                      </p>
+                      <p className="text-xs text-[#9aa0a8] mt-0.5">{soat(sv.createdAt)}</p>
+                    </div>
+                    <p className={`text-sm font-bold shrink-0 ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
+                      {money(sv.totalPrice)} s
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

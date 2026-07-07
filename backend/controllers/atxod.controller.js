@@ -3,7 +3,7 @@ const Atxod = require('../models/Atxod')
 exports.create = async (req, res, next) => {
   try {
     const { flowerType, razmer, qty, sabab, qiymat } = req.body
-    const photo = req.file ? `/uploads/atxod/${req.file.filename}` : null
+    const photo = req.file ? req.file.path : null
 
     if (!photo) return res.status(400).json({ message: 'Rasm majburiy' })
 
@@ -39,15 +39,26 @@ exports.create = async (req, res, next) => {
 
 exports.getAll = async (req, res, next) => {
   try {
+    const VALID_STATUS = ['pending', 'approved', 'rejected']
     const filter = {}
     if (req.user.role === 'kassa') filter.kassa = req.user.id
-    if (req.query.status) filter.status = req.query.status
+    if (req.query.status && VALID_STATUS.includes(req.query.status)) filter.status = req.query.status
 
     const atxodlar = await Atxod.find(filter)
       .populate('kassa', 'name')
       .sort({ createdAt: -1 })
 
     res.json(atxodlar)
+  } catch (err) {
+    next(err)
+  }
+}
+
+exports.getOne = async (req, res, next) => {
+  try {
+    const atxod = await Atxod.findById(req.params.id).populate('kassa', 'name')
+    if (!atxod) return res.status(404).json({ message: 'Topilmadi' })
+    res.json(atxod)
   } catch (err) {
     next(err)
   }

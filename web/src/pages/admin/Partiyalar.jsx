@@ -11,12 +11,41 @@ const FILTERS = [
   { key: 'farq_bor',      label: 'Farq' },
 ]
 
+const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+
 function summarize(flowers = []) {
   return flowers.map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
 }
-
-function fmt(d) {
-  return new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+function soat(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+function dateKey(d) {
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
+}
+function dateLabel(d) {
+  const dt = new Date(d)
+  const today = new Date()
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
+  if (dateKey(dt) === dateKey(today))     return 'Bugun'
+  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
+  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
+}
+function groupByDate(items) {
+  const groups = []
+  const seen = {}
+  for (const item of items) {
+    const key = dateKey(item.createdAt)
+    if (!seen[key]) {
+      seen[key] = { label: dateLabel(item.createdAt), items: [] }
+      groups.push(seen[key])
+    }
+    seen[key].items.push(item)
+  }
+  return groups
+}
+function formatBatchId(id = '') {
+  return id.replace(/^BATCH-/, 'PARTIYA-')
 }
 
 export default function AdminPartiyalar() {
@@ -78,25 +107,34 @@ export default function AdminPartiyalar() {
       {loading ? <Spinner /> : shown.length === 0 ? (
         <EmptyState text="Partiya yo'q" />
       ) : (
-        <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
-          {shown.map((p, i) => (
-            <button
-              key={p._id}
-              onClick={() => navigate(`/admin/farq/${p._id}`)}
-              className={`w-full flex items-center gap-3 p-4 text-left hover:bg-cbg transition-colors ${i > 0 ? 'border-t border-separator' : ''}`}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ctext">{p.batchId}</p>
-                <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
-                <p className="text-xs text-[#9aa0a8] mt-0.5">
-                  {p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'} · {fmt(p.createdAt)}
-                </p>
+        <div>
+          {groupByDate(shown).map(group => (
+            <div key={group.label}>
+              <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">
+                {group.label}
+              </p>
+              <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
+                {group.items.map((p, i) => (
+                  <button
+                    key={p._id}
+                    onClick={() => navigate(`/admin/farq/${p._id}`)}
+                    className={`w-full flex items-center gap-3 p-4 text-left hover:bg-cbg transition-colors ${i > 0 ? 'border-t border-separator' : ''}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
+                      <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
+                      <p className="text-xs text-[#9aa0a8] mt-0.5">
+                        {p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'} · {soat(p.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Badge status={p.status} />
+                      <ChevronRight size={16} className="text-cborder" />
+                    </div>
+                  </button>
+                ))}
               </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <Badge status={p.status} />
-                <ChevronRight size={16} className="text-cborder" />
-              </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
