@@ -3,6 +3,7 @@ const Sotuv   = require('../models/Sotuv')
 const Atxod   = require('../models/Atxod')
 const Partiya = require('../models/Partiya')
 const Qarz    = require('../models/Qarz')
+const FlowerType = require('../models/FlowerType')
 
 function dateRange(period, prev = false) {
   if (period === 'jami') return {}
@@ -70,8 +71,11 @@ exports.adminStats = async (req, res, next) => {
     const dateFilter     = Object.keys(cr).length     ? { createdAt: cr }     : {}
     const prevDateFilter = Object.keys(prevCr).length ? { createdAt: prevCr } : {}
 
+    // Bu hafta (oxirgi 7 kun) — eng ko'p / eng kam sotilgan gul (sotuv + qarz)
+    const weekCr = dateRange('haftalik')
+
     // Current + previous period basic stats in parallel
-    const [cur, prev, byType, atxodBySabab, farqCount, partiyaAgg] = await Promise.all([
+    const [cur, prev, byType, atxodBySabab, farqCount, partiyaAgg, sotuvWeek, qarzWeek, allTypes] = await Promise.all([
       calcStats(cr),
       calcStats(prevCr),
       Sotuv.aggregate([
@@ -88,7 +92,25 @@ exports.adminStats = async (req, res, next) => {
         { $match: dateFilter },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
+      Sotuv.aggregate([
+        { $match: { createdAt: weekCr } },
+        { $group: { _id: { $trim: { input: '$flowerType' } }, qty: { $sum: '$qty' } } },
+      ]),
+      Qarz.aggregate([
+        { $match: { createdAt: weekCr } },
+        { $unwind: '$flowers' },
+        { $group: { _id: { $trim: { input: '$flowers.type' } }, qty: { $sum: '$flowers.qty' } } },
+      ]),
+      FlowerType.find().select('name'),
     ])
+
+    // Spravochnikdagi barcha turlar (sotilmagani 0 bilan) + haftada sotilgan boshqa nomlar
+    const weekMap = new Map()
+    for (const t of allTypes) weekMap.set(t.name, 0)
+    for (const r of [...sotuvWeek, ...qarzWeek]) weekMap.set(r._id, (weekMap.get(r._id) || 0) + r.qty)
+    const weekRows = [...weekMap.entries()]
+      .map(([type, qty]) => ({ type, qty }))
+      .sort((a, b) => b.qty - a.qty)
 
     const partiyaStats = Object.fromEntries(partiyaAgg.map(p => [p._id, p.count]))
 
@@ -107,6 +129,11 @@ exports.adminStats = async (req, res, next) => {
       atxod: { qty: cur.atxodQty, by_sabab: atxodBySabab },
       farq:  { count: farqCount },
       gul_turlari: byType,
+      hafta_gullar: {
+        top: weekRows[0] ?? null,
+        low: weekRows.length ? weekRows[weekRows.length - 1] : null,
+        rows: weekRows,
+      },
       partiyalar: {
         jami:          (partiyaStats.yolda ?? 0) + (partiyaStats.qabul_qilindi ?? 0) + (partiyaStats.farq_bor ?? 0),
         yolda:         partiyaStats.yolda ?? 0,

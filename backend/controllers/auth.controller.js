@@ -22,7 +22,7 @@ exports.login = async (req, res, next) => {
 
     res.json({
       token: signToken(user),
-      user: { id: user._id, name: user.name, role: user.role, avatar: user.avatar },
+      user: { id: user._id, name: user.name, role: user.role },
     })
   } catch (err) {
     next(err)
@@ -92,14 +92,10 @@ exports.updateProfile = async (req, res, next) => {
       user.password = newPassword
     }
 
-    if (req.file) {
-      user.avatar = req.file.path
-    }
-
     await user.save()
     res.json({
       message: 'Profil yangilandi',
-      user: { id: user._id, name: user.name, role: user.role, avatar: user.avatar },
+      user: { id: user._id, name: user.name, role: user.role },
     })
   } catch (err) {
     next(err)

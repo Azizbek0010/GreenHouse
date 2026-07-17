@@ -1,11 +1,10 @@
-import { Plus, Trash2, Plus as PlusIcon } from 'lucide-react'
-
-const SIZES = [50, 60, 70, 80, 90, 100, 110]
-const TYPES = ['Roza', 'Lola', 'Xrizantema', 'Gerbera', 'Boshqa']
+import { Trash2, Plus as PlusIcon } from 'lucide-react'
+import FlowerTypeSelect from './FlowerTypeSelect'
+import { FLOWER_SIZES as SIZES } from '../lib/flowers'
 
 export default function FlowerListEditor({ flowers, onChange, label = 'Gullar' }) {
   const addFlower = () => {
-    onChange([...flowers, { type: TYPES[0], sizes: [] }])
+    onChange([...flowers, { type: '', sizes: [] }])
   }
 
   const removeFlower = (i) => {
@@ -47,15 +46,11 @@ export default function FlowerListEditor({ flowers, onChange, label = 'Gullar' }
         {flowers.map((f, fi) => (
           <div key={fi} className="bg-ccard rounded-2xl border border-cborder overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-separator">
-              <select
-                value={f.type}
-                onChange={e => setType(fi, e.target.value)}
-                className="text-sm font-semibold text-ctext bg-transparent outline-none"
-              >
-                {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <button onClick={() => removeFlower(fi)} className="text-cred p-1 hover:bg-red-bg rounded-lg">
+            <div className="flex items-center justify-between border-b border-separator">
+              <div className="flex-1">
+                <FlowerTypeSelect value={f.type} onChange={t => setType(fi, t)} />
+              </div>
+              <button onClick={() => removeFlower(fi)} className="text-cred p-1 mr-3 hover:bg-red-bg rounded-lg shrink-0">
                 <Trash2 size={15} />
               </button>
             </div>

@@ -1,13 +1,27 @@
 const Sotuv = require('../models/Sotuv')
+const { getRemaining } = require('../utils/stock')
 
 exports.create = async (req, res, next) => {
   try {
-    const { flowerType, razmer, qty, holat, pricePerUnit } = req.body
-    const photo = req.file ? req.file.path : null
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice } = req.body
 
     const qtyN = Number(qty), priceN = Number(pricePerUnit), razmerN = Number(razmer)
     if (!flowerType || !Number.isInteger(qtyN) || qtyN <= 0 || !Number.isFinite(priceN) || priceN <= 0 || !Number.isFinite(razmerN) || razmerN <= 0)
       return res.status(400).json({ message: 'Gul turi, razmer, soni va narx to\'g\'ri kiritilishi shart' })
+
+    let discountN = null
+    if (discountPrice != null && discountPrice !== '') {
+      discountN = Number(discountPrice)
+      if (!Number.isFinite(discountN) || discountN <= 0)
+        return res.status(400).json({ message: "Chegirma narxi to'g'ri kiritilishi shart" })
+      if (discountN > priceN * qtyN)
+        return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
+    }
+
+    // Ombor limiti: qabul qilingan gullardan ortiq sotib bo'lmaydi
+    const remaining = await getRemaining(req.user.id, flowerType, razmerN)
+    if (qtyN > remaining)
+      return res.status(400).json({ message: `Omborda ${flowerType} ${razmerN}sm dan faqat ${Math.max(remaining, 0)} ta qolgan` })
 
     const sotuv = await Sotuv.create({
       kassa: req.user.id,
@@ -16,7 +30,7 @@ exports.create = async (req, res, next) => {
       qty: qtyN,
       holat,
       pricePerUnit: priceN,
-      photo,
+      discountPrice: discountN,
     })
 
     const io = req.app.get('io')
@@ -61,6 +75,70 @@ exports.getOne = async (req, res, next) => {
     const sotuv = await Sotuv.findById(req.params.id).populate('kassa', 'name')
     if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
     res.json(sotuv)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// PATCH /api/sotuv/:id — admin tahrirlaydi (totalPrice pre-save da qayta hisoblanadi)
+exports.adminUpdate = async (req, res, next) => {
+  try {
+    const sotuv = await Sotuv.findById(req.params.id)
+    if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
+
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice } = req.body
+
+    if (flowerType !== undefined) {
+      if (!flowerType || typeof flowerType !== 'string' || !flowerType.trim())
+        return res.status(400).json({ message: "Gul turi noto'g'ri" })
+      sotuv.flowerType = flowerType.trim()
+    }
+    if (razmer !== undefined) {
+      const n = Number(razmer)
+      if (!Number.isFinite(n) || n <= 0) return res.status(400).json({ message: "Razmer noto'g'ri" })
+      sotuv.razmer = n
+    }
+    if (qty !== undefined) {
+      const n = Number(qty)
+      if (!Number.isInteger(n) || n <= 0) return res.status(400).json({ message: "Soni noto'g'ri" })
+      sotuv.qty = n
+    }
+    if (holat !== undefined) {
+      if (!['yaxshi', 'nuqsonli'].includes(holat)) return res.status(400).json({ message: "Holat noto'g'ri" })
+      sotuv.holat = holat
+    }
+    if (pricePerUnit !== undefined) {
+      const n = Number(pricePerUnit)
+      if (!Number.isFinite(n) || n <= 0) return res.status(400).json({ message: "Narx noto'g'ri" })
+      sotuv.pricePerUnit = n
+    }
+    if (discountPrice !== undefined) {
+      if (discountPrice === null || discountPrice === '') {
+        sotuv.discountPrice = null
+      } else {
+        const n = Number(discountPrice)
+        if (!Number.isFinite(n) || n <= 0)
+          return res.status(400).json({ message: "Chegirma narxi to'g'ri kiritilishi shart" })
+        sotuv.discountPrice = n
+      }
+    }
+    if (sotuv.discountPrice != null && sotuv.discountPrice > sotuv.pricePerUnit * sotuv.qty)
+      return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
+
+    await sotuv.save()
+    await sotuv.populate('kassa', 'name')
+    res.json(sotuv)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// DELETE /api/sotuv/:id — admin o'chiradi (statistika avtomatik qayta hisoblanadi)
+exports.adminDelete = async (req, res, next) => {
+  try {
+    const sotuv = await Sotuv.findByIdAndDelete(req.params.id)
+    if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
+    res.json({ message: "Sotuv o'chirildi", id: sotuv._id })
   } catch (err) {
     next(err)
   }

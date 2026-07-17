@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, X, Check } from 'lucide-react'
 import { api } from '../../lib/api'
-import { Badge, Spinner, EmptyState, ErrorMsg, SafeImg } from '../../components/ui'
+import { Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
 const FILTERS = [
   { key: 'pending',  label: 'Kutilmoqda', color: 'text-corange' },
@@ -133,8 +133,6 @@ export default function AdminAtxod() {
               <div className="space-y-3">
                 {group.items.map(a => (
                   <div key={a._id} className="bg-ccard border border-cborder rounded-2xl overflow-hidden">
-                    <SafeImg src={a.photo} className="w-full h-48" />
-
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-base font-semibold text-ctext">

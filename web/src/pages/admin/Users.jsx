@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
 const ROLE_LABEL = { admin: 'Admin', teplitsa: 'Teplitsa', kassa: 'Kassa' }
@@ -12,17 +11,6 @@ const ROLE_COLOR = {
 }
 
 function UserAvatar({ user: u }) {
-  const [err, setErr] = useState(false)
-  if (u.avatar && !err) {
-    return (
-      <img
-        src={`${API_URL}${u.avatar}`}
-        className="w-10 h-10 rounded-full object-cover shrink-0"
-        alt=""
-        onError={() => setErr(true)}
-      />
-    )
-  }
   return (
     <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-base font-bold shrink-0">
       {(u.name || '?').charAt(0).toUpperCase()}

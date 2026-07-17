@@ -1,71 +1,25 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Camera, Eye, EyeOff, Check,
+  ArrowLeft, Eye, EyeOff, Check,
   Sun, Moon, ChevronDown, Phone, Lock, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
 import { api } from '../lib/api'
-import { API_URL } from '../lib/config'
 
 const ROLE_LABEL = { admin: 'Administrator', teplitsa: 'Teplitsa', kassa: 'Kassa' }
 
 // ── Avatar ──
-function AvatarBlock({ user, onUpload }) {
-  const [imgErr, setImgErr]     = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [err, setErr]           = useState('')
-  const fileRef = useRef()
-
-  const handleFile = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setErr(''); setUploading(true)
-    try {
-      const form = new FormData()
-      form.append('avatar', file)
-      const data = await api.patchForm('/api/auth/profile', form)
-      onUpload(data.user?.avatar || data.avatar)
-      setImgErr(false)
-    } catch (e) { setErr(e.message) }
-    finally { setUploading(false) }
-  }
-
-  const av = user?.avatar
-  const src = av && !imgErr
-    ? (av.startsWith('http') ? av : `${API_URL}${av}`)
-    : null
-
+function AvatarBlock({ user }) {
   return (
     <div className="flex items-center gap-4 px-4 py-5">
-      <div className="relative shrink-0">
-        {src ? (
-          <img src={src} className="w-16 h-16 rounded-full object-cover" alt="" onError={() => setImgErr(true)} />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold">
-            {(user?.name || '?').charAt(0).toUpperCase()}
-          </div>
-        )}
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="absolute bottom-0 right-0 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-white shadow hover:opacity-90 transition-opacity"
-        >
-          {uploading
-            ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            : <Camera size={11} />
-          }
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold shrink-0">
+        {(user?.name || '?').charAt(0).toUpperCase()}
       </div>
       <div className="min-w-0">
         <p className="text-base font-bold text-ctext leading-tight">{user?.name}</p>
         <p className="text-sm text-text-sub mt-0.5">{ROLE_LABEL[user?.role]}</p>
-        {err && <p className="text-xs text-cred mt-1">{err}</p>}
-        <button onClick={() => fileRef.current?.click()} className="text-xs text-primary font-medium mt-1 hover:underline">
-          Rasmni o'zgartirish
-        </button>
       </div>
     </div>
   )
@@ -82,9 +36,7 @@ function NameForm({ user, onSave }) {
     if (!name.trim()) return setErr('Ismni kiriting')
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('name', name.trim())
-      const data = await api.patchForm('/api/auth/profile', form)
+      const data = await api.patch('/api/auth/profile', { name: name.trim() })
       onSave(data.user)
       setMsg('Saqlandi!'); setTimeout(() => setMsg(''), 2000)
     } catch (e) { setErr(e.message) }
@@ -151,9 +103,7 @@ function LoginForm({ user, onSave }) {
     if (phone.length !== 9) return setErr("Telefon 9 raqam bo'lishi kerak")
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('phone', '+998' + phone)
-      const data = await api.patchForm('/api/auth/profile', form)
+      const data = await api.patch('/api/auth/profile', { phone: '+998' + phone })
       onSave(data.user)
       setMsg('Login yangilandi!'); setTimeout(() => setMsg(''), 2500)
     } catch (e) { setErr(e.message) }
@@ -199,10 +149,7 @@ function PasswordForm() {
     if (nw !== cnf)    return setErr('Parollar mos emas')
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('currentPassword', cur)
-      form.append('newPassword', nw)
-      await api.patchForm('/api/auth/profile', form)
+      await api.patch('/api/auth/profile', { currentPassword: cur, newPassword: nw })
       setMsg("Parol o'zgartirildi!"); setCur(''); setNw(''); setCnf('')
       setTimeout(() => setMsg(''), 2500)
     } catch (e) { setErr(e.message) }
@@ -263,7 +210,7 @@ export default function Profil() {
       {/* Avatar + ism */}
       <p className="text-xs font-semibold text-text-sub uppercase tracking-wider px-1 mb-2">Profil</p>
       <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
-        <AvatarBlock user={user} onUpload={(avatar) => updateUser({ avatar })} />
+        <AvatarBlock user={user} />
         <div className="border-t border-separator">
           <NameForm user={user} onSave={(u) => updateUser(u)} />
         </div>

@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
   phone:    { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role:     { type: String, enum: ['admin', 'teplitsa', 'kassa'], required: true },
-  avatar:   { type: String, default: null },
   expoPushToken: { type: String, default: null },
 }, { timestamps: true })
 

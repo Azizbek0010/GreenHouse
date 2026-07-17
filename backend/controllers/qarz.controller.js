@@ -1,9 +1,7 @@
 const Qarz = require('../models/Qarz')
+const { getStockMap, key } = require('../utils/stock')
 
-// FormData ichida flowers JSON string bo'lib keladi
-function parseFlowers(raw) {
-  let arr
-  try { arr = typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return null }
+function parseFlowers(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null
 
   const flowers = []
@@ -15,12 +13,23 @@ function parseFlowers(raw) {
     if (!type || !Number.isFinite(razmer) || razmer <= 0 ||
         !Number.isInteger(qty) || qty <= 0 ||
         !Number.isFinite(price) || price <= 0) return null
-    flowers.push({ type, razmer, qty, pricePerUnit: price })
+
+    let discountPrice = null
+    if (f.discountPrice != null && f.discountPrice !== '') {
+      discountPrice = Number(f.discountPrice)
+      if (!Number.isFinite(discountPrice) || discountPrice <= 0 || discountPrice > price * qty) return null
+    }
+
+    flowers.push({ type, razmer, qty, pricePerUnit: price, discountPrice })
   }
   return flowers
 }
 
-// POST /api/qarz — kassa qarzga sotadi (2 rasm: flowerPhoto + buyerPhoto)
+function flowerTotal(f) {
+  return f.discountPrice != null ? f.discountPrice : f.pricePerUnit * f.qty
+}
+
+// POST /api/qarz — kassa qarzga sotadi
 exports.create = async (req, res, next) => {
   try {
     const flowers = parseFlowers(req.body.flowers)
@@ -32,18 +41,27 @@ exports.create = async (req, res, next) => {
     if (!name)  return res.status(400).json({ message: 'Sotib oluvchi ismi shart' })
     if (!phone) return res.status(400).json({ message: 'Telefon raqami shart' })
 
-    const flowerPhoto = req.files?.flowerPhoto?.[0]?.path || null
-    const buyerPhoto  = req.files?.buyerPhoto?.[0]?.path  || null
-    if (!flowerPhoto) return res.status(400).json({ message: 'Gul rasmi shart' })
-    if (!buyerPhoto)  return res.status(400).json({ message: 'Sotib oluvchi rasmi shart' })
+    // Ombor limiti: har bir (tur, razmer) bo'yicha jami so'ralgan soni qoldiqdan oshmasin
+    const stock = await getStockMap(req.user.id)
+    const need  = new Map()
+    for (const f of flowers) {
+      const k = key(f.type, f.razmer)
+      need.set(k, (need.get(k) || 0) + f.qty)
+    }
+    for (const [k, qty] of need) {
+      const have = stock.get(k) ? stock.get(k).remaining : 0
+      if (qty > have) {
+        const [t, sm] = k.split('|')
+        return res.status(400).json({ message: `Omborda ${t} ${sm}sm dan faqat ${Math.max(have, 0)} ta qolgan` })
+      }
+    }
 
-    const totalPrice = flowers.reduce((s, f) => s + f.pricePerUnit * f.qty, 0)
+    const totalPrice = flowers.reduce((s, f) => s + flowerTotal(f), 0)
 
     const qarz = await Qarz.create({
       kassa: req.user.id,
       flowers,
-      flowerPhoto,
-      buyer: { name, phone, photo: buyerPhoto },
+      buyer: { name, phone },
       totalPrice,
     })
 
@@ -96,6 +114,73 @@ exports.getOne = async (req, res, next) => {
     const qarz = await Qarz.findById(req.params.id).populate('kassa', 'name')
     if (!qarz) return res.status(404).json({ message: 'Topilmadi' })
     res.json(qarz)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// PATCH /api/qarz/:id — admin qarzni to'liq tahrirlaydi (gullar, xaridor, to'lovlar)
+exports.adminUpdate = async (req, res, next) => {
+  try {
+    const qarz = await Qarz.findById(req.params.id)
+    if (!qarz) return res.status(404).json({ message: 'Topilmadi' })
+
+    if (req.body.flowers !== undefined) {
+      const flowers = parseFlowers(req.body.flowers)
+      if (!flowers)
+        return res.status(400).json({ message: "Gullar ma'lumoti noto'g'ri kiritilgan" })
+      qarz.flowers = flowers
+      qarz.totalPrice = flowers.reduce((s, f) => s + flowerTotal(f), 0)
+    }
+
+    if (req.body.buyerName !== undefined) {
+      const name = (req.body.buyerName || '').trim()
+      if (!name) return res.status(400).json({ message: 'Sotib oluvchi ismi shart' })
+      qarz.buyer.name = name
+    }
+    if (req.body.buyerPhone !== undefined) {
+      const phone = (req.body.buyerPhone || '').trim()
+      if (!phone) return res.status(400).json({ message: 'Telefon raqami shart' })
+      qarz.buyer.phone = phone
+    }
+
+    if (req.body.payments !== undefined) {
+      if (!Array.isArray(req.body.payments))
+        return res.status(400).json({ message: "To'lovlar ro'yxati noto'g'ri" })
+      const payments = []
+      for (const p of req.body.payments) {
+        const amount = Number(p.amount)
+        const at = p.at ? new Date(p.at) : new Date()
+        if (!Number.isFinite(amount) || amount <= 0 || isNaN(at.getTime()))
+          return res.status(400).json({ message: "To'lov summasi yoki sanasi noto'g'ri" })
+        payments.push({ amount, at })
+      }
+      payments.sort((a, b) => a.at - b.at)
+      qarz.payments = payments
+    }
+
+    // paidAmount / isPaid / paidAt har doim qayta hisoblanadi
+    // (flowers o'zgarsa totalPrice o'zgaradi — holat ham o'zgarishi mumkin)
+    qarz.paidAmount = qarz.payments.reduce((s, p) => s + p.amount, 0)
+    if (qarz.paidAmount > qarz.totalPrice)
+      return res.status(400).json({ message: `To'langan summa (${qarz.paidAmount}) umumiy qarzdan (${qarz.totalPrice}) oshib ketdi` })
+    qarz.isPaid = qarz.paidAmount >= qarz.totalPrice
+    qarz.paidAt = qarz.isPaid ? (qarz.payments[qarz.payments.length - 1]?.at ?? new Date()) : null
+
+    await qarz.save()
+    await qarz.populate('kassa', 'name')
+    res.json(qarz)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// DELETE /api/qarz/:id — admin o'chiradi (to'lov daromadi ham statistikadan yo'qoladi)
+exports.adminDelete = async (req, res, next) => {
+  try {
+    const qarz = await Qarz.findByIdAndDelete(req.params.id)
+    if (!qarz) return res.status(404).json({ message: 'Topilmadi' })
+    res.json({ message: "Qarz o'chirildi", id: qarz._id })
   } catch (err) {
     next(err)
   }

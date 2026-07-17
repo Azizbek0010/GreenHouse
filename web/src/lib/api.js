@@ -35,26 +35,9 @@ async function request(path, { method = 'GET', body } = {}) {
   return data
 }
 
-async function requestForm(path, form, method = 'POST') {
-  const headers = {}
-  if (memToken) headers.Authorization = `Bearer ${memToken}`
-
-  let res
-  try {
-    res = await fetch(`${API_URL}${path}`, { method, headers, body: form })
-  } catch (e) {
-    throw new Error(`Serverga ulanib bo'lmadi.`)
-  }
-
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(`${data.message || 'Xatolik yuz berdi'} [${res.status}]`)
-  return data
-}
-
 export const api = {
-  get:      (path)        => request(path),
-  post:     (path, body)  => request(path, { method: 'POST', body }),
-  patch:    (path, body)  => request(path, { method: 'PATCH', body }),
-  postForm: (path, form)  => requestForm(path, form),
-  patchForm:(path, form)  => requestForm(path, form, 'PATCH'),
+  get:   (path)       => request(path),
+  post:  (path, body) => request(path, { method: 'POST', body }),
+  patch: (path, body) => request(path, { method: 'PATCH', body }),
+  del:   (path)       => request(path, { method: 'DELETE' }),
 }

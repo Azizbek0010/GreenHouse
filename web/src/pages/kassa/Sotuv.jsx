@@ -1,65 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Trash2 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
-import BottomModal from '../../components/BottomModal'
-
-const TYPES = ['Roza', 'Lola', 'Xrizantema', 'Gerbera', 'Gladiolus', 'Pion', 'Boshqa']
-const SIZES = [50, 60, 70, 80, 90, 100, 110]
+import { useStockMap, stockRemaining, StockTypeSelect, StockSizeButtons } from '../../components/StockFlowerPicker'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
 function num(s)      { return parseInt(String(s).replace(/\s/g, '')) || 0 }
 function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
 
-// ── Bottom-sheet modal picker ──────────────────────────────────────
-function SelectModal({ options, value, onChange, placeholder = 'Tanlang...' }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center justify-between w-full px-4 py-3.5 text-left"
-      >
-        <span className={`text-base ${value ? 'text-ctext font-semibold' : 'text-text-sub'}`}>
-          {value || placeholder}
-        </span>
-        <ChevronDown size={16} className="text-text-sub shrink-0" />
-      </button>
-
-      <BottomModal open={open} onClose={() => setOpen(false)} title={placeholder}>
-        {options.map(opt => (
-          <button
-            key={opt}
-            onClick={() => { onChange(opt); setOpen(false) }}
-            className={`flex items-center justify-between w-full px-5 py-4 text-base font-medium transition-colors ${
-              opt === value ? 'text-primary bg-blue-bg' : 'text-ctext hover:bg-cbg'
-            }`}
-          >
-            {opt}
-            {opt === value && <Check size={16} />}
-          </button>
-        ))}
-      </BottomModal>
-    </>
-  )
-}
-
 // ── One flower line item ──────────────────────────────────────────
-function FlowerRow({ item, onChange, onRemove, canRemove }) {
+function FlowerRow({ item, onChange, onRemove, canRemove, stock }) {
   const update = (field, val) => onChange({ ...item, [field]: val })
+  const remaining = item.type && item.razmer ? stockRemaining(stock, item.type, item.razmer) : null
 
   return (
     <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
       {/* Header row: type + remove */}
       <div className="flex items-center border-b border-separator">
         <div className="flex-1">
-          <SelectModal
-            options={TYPES}
+          <StockTypeSelect
+            stock={stock}
             value={item.type}
-            onChange={v => update('type', v)}
-            placeholder="Gul turini tanlang"
+            onChange={v => onChange({ ...item, type: v, razmer: null })}
           />
         </div>
         {canRemove && (
@@ -72,29 +35,27 @@ function FlowerRow({ item, onChange, onRemove, canRemove }) {
         )}
       </div>
 
-      {/* Razmer */}
+      {/* Razmer — faqat omborda qolgani */}
       <div className="px-4 py-3 border-b border-separator">
         <p className="text-xs text-text-sub mb-2 font-medium">Razmer</p>
-        <div className="flex flex-wrap gap-1.5">
-          {SIZES.map(z => (
-            <button
-              key={z}
-              onClick={() => update('razmer', z)}
-              className={`px-3 h-8 rounded-lg text-sm font-medium transition-colors border ${
-                item.razmer === z
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-cbg text-ctext border-cborder hover:border-primary'
-              }`}
-            >
-              {z}sm
-            </button>
-          ))}
-        </div>
+        <StockSizeButtons
+          stock={stock}
+          type={item.type}
+          value={item.razmer}
+          onChange={z => update('razmer', z)}
+        />
       </div>
 
       {/* Soni va narx */}
       <div className="flex items-center px-4 py-3 border-b border-separator">
-        <span className="flex-1 text-sm text-ctext">Soni</span>
+        <span className="flex-1 text-sm text-ctext">
+          Soni
+          {remaining != null && (
+            <span className={`ml-2 text-xs ${num(item.qty) > remaining ? 'text-cred font-semibold' : 'text-text-sub'}`}>
+              (omborda {remaining} ta)
+            </span>
+          )}
+        </span>
         <input
           type="text"
           inputMode="numeric"
@@ -120,9 +81,22 @@ function FlowerRow({ item, onChange, onRemove, canRemove }) {
 
       {/* Subtotal */}
       {num(item.qty) > 0 && num(item.narx) > 0 && (
-        <div className="px-4 py-2.5 bg-blue-bg border-t border-separator flex items-center justify-between">
-          <span className="text-xs text-primary">{num(item.qty)} × {money(num(item.narx))}</span>
-          <span className="text-sm font-bold text-primary">{money(num(item.qty) * num(item.narx))} so'm</span>
+        <div className="px-4 py-2.5 bg-blue-bg border-t border-separator">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-primary">{num(item.qty)} × {money(num(item.narx))}</span>
+            <span className="text-sm font-bold text-primary">{money(num(item.qty) * num(item.narx))} so'm</span>
+          </div>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/20">
+            <span className="text-xs text-primary/70">Chegirma bilan (ixtiyoriy)</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={fmtInput(item.chegirma)}
+              onChange={e => update('chegirma', e.target.value.replace(/[\s\D]/g, ''))}
+              placeholder="Yakuniy narx"
+              className="w-32 text-right bg-transparent text-primary text-sm font-semibold outline-none placeholder:text-primary/40"
+            />
+          </div>
         </div>
       )}
     </div>
@@ -130,12 +104,17 @@ function FlowerRow({ item, onChange, onRemove, canRemove }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────
-const newItem = () => ({ id: Date.now() + Math.random(), type: '', razmer: null, qty: '', narx: '', holat: 'yaxshi' })
+const newItem = () => ({ id: Date.now() + Math.random(), type: '', razmer: null, qty: '', narx: '', chegirma: '', holat: 'yaxshi' })
+function itemTotal(it) {
+  const orig = num(it.qty) * num(it.narx)
+  const disc = num(it.chegirma)
+  return disc > 0 ? disc : orig
+}
 
 export default function Sotuv() {
   const navigate = useNavigate()
+  const { stock } = useStockMap()
   const [items, setItems]   = useState([newItem()])
-  const [photo, setPhoto]   = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -143,7 +122,7 @@ export default function Sotuv() {
   const removeItem = (id)          => setItems(prev => prev.filter(it => it.id !== id))
   const addItem    = ()            => setItems(prev => [...prev, newItem()])
 
-  const total    = items.reduce((s, it) => s + num(it.qty) * num(it.narx), 0)
+  const total    = items.reduce((s, it) => s + itemTotal(it), 0)
   const totalQty = items.reduce((s, it) => s + num(it.qty), 0)
 
   const onSave = async () => {
@@ -152,19 +131,30 @@ export default function Sotuv() {
       if (!it.razmer)           return setError('Razmerni tanlang')
       if (!(num(it.qty)  > 0)) return setError('Sonni kiriting')
       if (!(num(it.narx) > 0)) return setError('Narxni kiriting')
+      if (num(it.chegirma) > 0 && num(it.chegirma) > num(it.qty) * num(it.narx))
+        return setError("Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas")
+    }
+    // Ombor limiti: bir xil (tur, razmer) qatorlar jami qoldiqdan oshmasin
+    const need = new Map()
+    for (const it of items) {
+      const k = `${it.type}|${it.razmer}`
+      need.set(k, (need.get(k) || 0) + num(it.qty))
+    }
+    for (const [k, qty] of need) {
+      const [t, sm] = k.split('|')
+      const have = stockRemaining(stock, t, Number(sm))
+      if (qty > have) return setError(`Omborda ${t} ${sm}sm dan faqat ${have} ta qolgan`)
     }
     setError(''); setSaving(true)
     try {
-      await Promise.all(items.map(it => {
-        const form = new FormData()
-        form.append('flowerType',   it.type)
-        form.append('razmer',       String(it.razmer))
-        form.append('qty',          String(num(it.qty)))
-        form.append('holat',        it.holat)
-        form.append('pricePerUnit', String(num(it.narx)))
-        if (photo) form.append('photo', photo)
-        return api.postForm('/api/sotuv', form)
-      }))
+      await Promise.all(items.map(it => api.post('/api/sotuv', {
+        flowerType:   it.type,
+        razmer:       it.razmer,
+        qty:          num(it.qty),
+        holat:        it.holat,
+        pricePerUnit: num(it.narx),
+        discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
+      })))
       navigate('/kassa')
     } catch (e) {
       setError(e.message)
@@ -190,6 +180,7 @@ export default function Sotuv() {
         <FlowerRow
           key={item.id}
           item={item}
+          stock={stock}
           onChange={updated => updateItem(item.id, updated)}
           onRemove={() => removeItem(item.id)}
           canRemove={items.length > 1}
@@ -232,17 +223,6 @@ export default function Sotuv() {
           <p className="text-2xl font-bold text-primary">{money(total)} <span className="text-base font-medium">s</span></p>
         </div>
       )}
-
-      {/* Photo */}
-      <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Rasm (ixtiyoriy)</p>
-      <label className="flex flex-col items-center justify-center h-32 rounded-2xl border-2 border-dashed border-cborder bg-ccard hover:border-primary cursor-pointer transition-colors mb-5 overflow-hidden">
-        {photo ? (
-          <img src={URL.createObjectURL(photo)} className="h-full w-full object-cover" alt="" />
-        ) : (
-          <p className="text-text-sub text-sm">Rasm yuklash uchun bosing</p>
-        )}
-        <input type="file" accept="image/*" className="hidden" onChange={e => setPhoto(e.target.files[0] || null)} />
-      </label>
 
       <button
         onClick={onSave}

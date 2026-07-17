@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Flower2, AlertTriangle, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
 import { StatCard, Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
 const PERIODS = [
@@ -41,11 +40,6 @@ function farqLine(f) {
   return `${f.type} ${f.sm}sm: kutilgan ${f.sent} ta, keldi ${f.received} ta (${d})`
 }
 
-function imgSrc(src) {
-  if (!src) return null
-  return src.startsWith('http') ? src : `${API_URL}${src}`
-}
-
 function PartiyaCard({ p, onClick }) {
   const [expanded, setExpanded] = useState(false)
   return (
@@ -60,25 +54,6 @@ function PartiyaCard({ p, onClick }) {
         <p className="text-sm text-text-sub">{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'}</p>
         <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
         <p className="text-xs text-text-sub/60 mt-0.5">{new Date(p.createdAt).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit' })} · {new Date(p.createdAt).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' })}</p>
-
-        {(p.sentPhoto || p.photo) && (
-          <div className={`mt-3 grid gap-2 ${p.sentPhoto && p.photo ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-            {p.sentPhoto && (
-              <div>
-                <p className="text-[10px] font-semibold text-text-sub uppercase tracking-wider mb-1">Teplitsa</p>
-                <img src={imgSrc(p.sentPhoto)} className="w-full h-32 object-cover rounded-xl" alt=""
-                  onError={e => { e.target.style.display = 'none' }} />
-              </div>
-            )}
-            {p.photo && (
-              <div>
-                <p className="text-[10px] font-semibold text-text-sub uppercase tracking-wider mb-1">Kassa</p>
-                <img src={imgSrc(p.photo)} className="w-full h-32 object-cover rounded-xl" alt=""
-                  onError={e => { e.target.style.display = 'none' }} />
-              </div>
-            )}
-          </div>
-        )}
 
         {p.farq?.length > 0 && (
           <button onClick={() => setExpanded(v => !v)}

@@ -1,25 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ImageOff, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Clock, Pencil } from 'lucide-react'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
-import { Spinner, ErrorMsg } from '../../components/ui'
+import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../components/ui'
+import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
+import BottomModal from '../../components/BottomModal'
+import FlowerTypeSelect from '../../components/FlowerTypeSelect'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 
-function SafeImg({ src, className }) {
-  const [err, setErr] = useState(false)
-  const fullSrc = src ? (src.startsWith('http') ? src : `${API_URL}${src}`) : null
-  if (!fullSrc || err) {
-    return (
-      <div className={`${className} flex flex-col items-center justify-center gap-2 bg-cbg rounded-2xl`}>
-        <ImageOff size={32} className="text-cgray" />
-        <span className="text-sm text-cgray">Rasm yo'q</span>
-      </div>
-    )
-  }
-  return <img src={fullSrc} className={className} alt="" onError={() => setErr(true)} />
-}
+const SABABLAR = ["so'lgan", 'nuqsonli', 'singan', 'boshqa']
+const SABAB_LABEL = { "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Singan', boshqa: 'Boshqa' }
 
 function StatusBadge({ status }) {
   if (status === 'approved') return (
@@ -42,9 +33,14 @@ function StatusBadge({ status }) {
 export default function AtxodDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [ax, setAx]       = useState(null)
+  const [ax, setAx]           = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [form, setForm]         = useState(null)
+  const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     api.get(`/api/atxod/${id}`)
@@ -52,6 +48,47 @@ export default function AtxodDetail() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
+
+  function openEdit() {
+    setForm({
+      flowerType: ax.flowerType,
+      razmer:     String(ax.razmer),
+      qty:        String(ax.qty),
+      sabab:      ax.sabab,
+      qiymat:     String(ax.qiymat),
+      status:     ax.status,
+      adminNote:  ax.adminNote || '',
+    })
+    setEditOpen(true)
+  }
+
+  async function handleSave() {
+    setSaving(true); setError('')
+    try {
+      const updated = await api.patch(`/api/atxod/${id}`, {
+        flowerType: form.flowerType,
+        razmer:     Number(form.razmer),
+        qty:        Number(form.qty),
+        sabab:      form.sabab,
+        qiymat:     Number(form.qiymat),
+        status:     form.status,
+        adminNote:  form.adminNote.trim() || null,
+      })
+      setAx(updated)
+      setEditOpen(false)
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete() {
+    setDeleting(true); setError('')
+    try {
+      await api.del(`/api/atxod/${id}`)
+      navigate(-1)
+    } catch (e) { setError(e.message); setDeleting(false) }
+  }
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -72,27 +109,75 @@ export default function AtxodDetail() {
           </div>
 
           {ax && (
-            <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
-              {[
-                { label: 'Kassa',   value: ax.kassa?.name || '—' },
-                { label: 'Soni',    value: `${ax.qty} ta` },
-                { label: 'Qiymat',  value: `${money(ax.qiymat)} so'm` },
-                { label: 'Sabab',   value: ax.sabab || '—' },
-                { label: 'Sana',    value: new Date(ax.createdAt).toLocaleString('ru-RU') },
-                ...(ax.adminNote ? [{ label: 'Admin izohi', value: ax.adminNote }] : []),
-              ].map(({ label, value }, i) => (
-                <div key={label} className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? 'border-t border-separator' : ''}`}>
-                  <span className="text-sm text-text-sub">{label}</span>
-                  <span className="text-sm font-semibold text-ctext text-right max-w-[60%]">{value}</span>
-                </div>
-              ))}
-            </div>
-          )}
+            <>
+              <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
+                {[
+                  { label: 'Kassa',   value: ax.kassa?.name || '—' },
+                  { label: 'Soni',    value: `${ax.qty} ta` },
+                  { label: 'Qiymat',  value: `${money(ax.qiymat)} so'm` },
+                  { label: "Yo'qotish (jami)", value: `${money(ax.qiymat * ax.qty)} so'm` },
+                  { label: 'Sabab',   value: SABAB_LABEL[ax.sabab] || ax.sabab || '—' },
+                  { label: 'Sana',    value: new Date(ax.createdAt).toLocaleString('ru-RU') },
+                  ...(ax.adminNote ? [{ label: 'Admin izohi', value: ax.adminNote }] : []),
+                ].map(({ label, value }, i) => (
+                  <div key={label} className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? 'border-t border-separator' : ''}`}>
+                    <span className="text-sm text-text-sub">{label}</span>
+                    <span className="text-sm font-semibold text-ctext text-right max-w-[60%]">{value}</span>
+                  </div>
+                ))}
+              </div>
 
-          <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Rasm</p>
-          <SafeImg src={ax?.photo} className="w-full object-cover rounded-2xl" />
+              {/* Admin: tahrirlash / o'chirish */}
+              <div className="space-y-3">
+                <OutlineButton title="Tahrirlash" icon={<Pencil size={17} />} onClick={openEdit} />
+                <DeleteButton onConfirm={handleDelete} loading={deleting} label="Atxodni o'chirish" />
+              </div>
+            </>
+          )}
         </>
       )}
+
+      <BottomModal open={editOpen} onClose={() => setEditOpen(false)} title="Atxodni tahrirlash">
+        {form && (
+          <div className="px-5 pt-4 space-y-3">
+            <Field label="Gul turi">
+              <FlowerTypeSelect boxed value={form.flowerType} onChange={v => setForm(f => ({ ...f, flowerType: v }))} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Razmer (sm)">
+                <input type="text" inputMode="numeric" value={form.razmer}
+                  onChange={e => setForm(f => ({ ...f, razmer: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+              </Field>
+              <Field label="Soni">
+                <input type="text" inputMode="numeric" value={form.qty}
+                  onChange={e => setForm(f => ({ ...f, qty: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Sabab">
+                <select value={form.sabab} onChange={set('sabab')} className={inputCls}>
+                  {SABABLAR.map(s => <option key={s} value={s}>{SABAB_LABEL[s]}</option>)}
+                </select>
+              </Field>
+              <Field label="Qiymat (1 ta, so'm)">
+                <input type="text" inputMode="numeric" value={form.qiymat}
+                  onChange={e => setForm(f => ({ ...f, qiymat: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+              </Field>
+            </div>
+            <Field label="Status">
+              <select value={form.status} onChange={set('status')} className={inputCls}>
+                <option value="pending">Kutilmoqda</option>
+                <option value="approved">Tasdiqlandi</option>
+                <option value="rejected">Rad etildi</option>
+              </select>
+            </Field>
+            <Field label="Admin izohi (ixtiyoriy)">
+              <input value={form.adminNote} onChange={set('adminNote')} className={inputCls} />
+            </Field>
+            <PrimaryButton title="Saqlash" onClick={handleSave} loading={saving} />
+          </div>
+        )}
+      </BottomModal>
     </div>
   )
 }

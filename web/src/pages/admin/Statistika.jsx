@@ -215,6 +215,7 @@ export default function AdminStatistika() {
   const maxSab    = Math.max(1, ...bySabab.map(s => s.qty))
   const pt        = stats?.partiyalar || { jami: 0, yolda: 0, qabul_qilindi: 0, farq_bor: 0 }
   const prev      = stats?.prev
+  const hafta     = stats?.hafta_gullar
   const shownGul  = showAllGul ? turlar : turlar.slice(0, 3)
 
   return (
@@ -313,6 +314,33 @@ export default function AdminStatistika() {
               </div>
             </div>
           </div>
+
+          {/* ── Bu hafta: eng ko'p / eng kam sotilgan gul (sotuv bo'lmasa ko'rsatilmaydi) ── */}
+          {hafta?.top?.qty > 0 && (
+            <>
+              <SLabel icon={Flower2} label="Bu hafta (7 kun)" iconColor="text-corange" iconBg="bg-orange-bg" />
+              <div className="flex gap-3 mb-5">
+                <div className="flex-1 bg-green-bg rounded-2xl p-4 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp size={14} className="text-cgreen" />
+                    <p className="text-[11px] font-semibold text-cgreen uppercase tracking-wider">Eng ko'p sotilgan</p>
+                  </div>
+                  <p className="text-base font-bold text-ctext truncate">{hafta.top.type}</p>
+                  <p className="text-sm font-semibold text-cgreen mt-0.5">{hafta.top.qty} ta</p>
+                </div>
+                {hafta.low && hafta.low.type !== hafta.top.type && (
+                  <div className="flex-1 bg-red-bg rounded-2xl p-4 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <TrendingDown size={14} className="text-cred" />
+                      <p className="text-[11px] font-semibold text-cred uppercase tracking-wider">Eng kam sotilgan</p>
+                    </div>
+                    <p className="text-base font-bold text-ctext truncate">{hafta.low.type}</p>
+                    <p className="text-sm font-semibold text-cred mt-0.5">{hafta.low.qty} ta</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* ── Gul turlari ── */}
           <SLabel icon={Flower2} label="Gul turlari bo'yicha sotuv" iconColor="text-primary" iconBg="bg-blue-bg"

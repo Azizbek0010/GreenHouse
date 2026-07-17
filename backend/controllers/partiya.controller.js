@@ -19,17 +19,7 @@ function validateFlowers(flowers) {
 
 exports.create = async (req, res, next) => {
   try {
-    const sentPhoto = req.file ? req.file.path : null
-    if (!sentPhoto) return res.status(400).json({ message: 'Rasm majburiy' })
-
-    // multipart orqali flowers JSON-string sifatida keladi
-    let flowers = req.body.flowers
-    if (typeof flowers === 'string') {
-      try { flowers = JSON.parse(flowers) }
-      catch { return res.status(400).json({ message: "flowers noto'g'ri formatda" }) }
-    }
-
-    const { kassaId } = req.body
+    const { kassaId, flowers } = req.body
     const flowersError = validateFlowers(flowers)
     if (flowersError) return res.status(400).json({ message: flowersError })
 
@@ -41,7 +31,6 @@ exports.create = async (req, res, next) => {
       teplitsa:  req.user.id,
       kassa:     kassaId,
       sent:      flowers,
-      sentPhoto,
     })
 
     if (kassa.expoPushToken) {
@@ -55,12 +44,11 @@ exports.create = async (req, res, next) => {
       teplitsa: req.user.name,
       message:  "Yangi partiya yo'lda!",
     })
-    // Admin real-time: teplitsa yubordi + rasm bor
+    // Admin real-time: teplitsa yubordi
     io.to('admin').emit('partiya_yangilandi', {
       batchId:   partiya.batchId,
       status:    'yolda',
       teplitsa:  req.user.name,
-      sentPhoto,
     })
 
     res.status(201).json(partiya)
@@ -72,16 +60,7 @@ exports.create = async (req, res, next) => {
 exports.receive = async (req, res, next) => {
   try {
     const { id } = req.params
-    const photo = req.file ? req.file.path : null
-
-    if (!photo) return res.status(400).json({ message: 'Rasm majburiy' })
-
-    // multipart/form-data orqali kelganda flowers JSON-string bo'ladi
-    let flowers = req.body.flowers
-    if (typeof flowers === 'string') {
-      try { flowers = JSON.parse(flowers) }
-      catch { return res.status(400).json({ message: 'flowers noto\'g\'ri formatda' }) }
-    }
+    const { flowers } = req.body
     const flowersError = validateFlowers(flowers)
     if (flowersError) return res.status(400).json({ message: flowersError })
 
@@ -95,7 +74,6 @@ exports.receive = async (req, res, next) => {
     if (partiya.status !== 'yolda') return res.status(400).json({ message: 'Partiya allaqachon qabul qilingan' })
 
     partiya.received = flowers
-    partiya.photo = photo
     partiya.farq = calcFarq(partiya.sent, flowers)
     partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
 
@@ -183,6 +161,61 @@ exports.getOne = async (req, res, next) => {
     }
 
     res.json(partiya)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// PATCH /api/partiya/:id — admin sent/received ni tahrirlaydi, farq avtomatik qayta hisoblanadi
+exports.adminUpdate = async (req, res, next) => {
+  try {
+    const partiya = await Partiya.findById(req.params.id)
+    if (!partiya) return res.status(404).json({ message: 'Topilmadi' })
+
+    const { sent, received } = req.body
+
+    if (sent !== undefined) {
+      const err = validateFlowers(sent)
+      if (err) return res.status(400).json({ message: `Yuborilgan gullar: ${err}` })
+      partiya.sent = sent
+    }
+
+    if (received !== undefined) {
+      if (partiya.status === 'yolda')
+        return res.status(400).json({ message: "Partiya hali qabul qilinmagan — faqat yuborilganini tahrirlash mumkin" })
+      const err = validateFlowers(received)
+      if (err) return res.status(400).json({ message: `Qabul qilingan gullar: ${err}` })
+      partiya.received = received
+    }
+
+    // Qabul qilingan partiyada farq va status qayta hisoblanadi
+    if (partiya.status !== 'yolda') {
+      partiya.farq = calcFarq(partiya.sent, partiya.received)
+      partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
+    }
+
+    await partiya.save()
+
+    const io = req.app.get('io')
+    io.to('admin').emit('partiya_yangilandi', {
+      batchId: partiya.batchId,
+      status:  partiya.status,
+      farq:    partiya.farq,
+    })
+
+    await partiya.populate([{ path: 'teplitsa', select: 'name' }, { path: 'kassa', select: 'name' }])
+    res.json(partiya)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// DELETE /api/partiya/:id — admin o'chiradi
+exports.adminDelete = async (req, res, next) => {
+  try {
+    const partiya = await Partiya.findByIdAndDelete(req.params.id)
+    if (!partiya) return res.status(404).json({ message: 'Topilmadi' })
+    res.json({ message: "Partiya o'chirildi", id: partiya._id })
   } catch (err) {
     next(err)
   }

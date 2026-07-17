@@ -17,8 +17,6 @@ const partiyaSchema = new mongoose.Schema({
   status:    { type: String, enum: ['yolda', 'qabul_qilindi', 'farq_bor'], default: 'yolda' },
   sent:      [flowerSchema],
   received:  [flowerSchema],
-  sentPhoto: { type: String, default: null },   // teplitsa yuborgan rasmi
-  photo:     { type: String, default: null },   // kassa qabul rasmi
   farq:      { type: Array, default: [] },
 }, { timestamps: true })
 

@@ -4,9 +4,8 @@ import { ArrowLeft, Package, Check, Plus, Trash2, ChevronDown } from 'lucide-rea
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
-
-const TYPES = ['Roza', 'Lola', 'Xrizantema', 'Gerbera', 'Gladiolus', 'Pion', 'Boshqa']
-const SIZES = [50, 60, 70, 80, 90, 100, 110]
+import FlowerTypeSelect from '../../components/FlowerTypeSelect'
+import { FLOWER_SIZES as SIZES } from '../../lib/flowers'
 
 // ── Kassa tanlash modal ───────────────────────────────────────────
 function KassaSelect({ kassalar, value, onChange }) {
@@ -42,39 +41,6 @@ function KassaSelect({ kassalar, value, onChange }) {
   )
 }
 
-// ── Gul turi tanlash modal ────────────────────────────────────────
-function TypeSelect({ value, onChange }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center justify-between w-full px-4 py-3.5 text-left"
-      >
-        <span className={`text-base ${value ? 'text-ctext font-semibold' : 'text-text-sub'}`}>
-          {value || 'Gul turini tanlang'}
-        </span>
-        <ChevronDown size={16} className="text-text-sub shrink-0" />
-      </button>
-      <BottomModal open={open} onClose={() => setOpen(false)} title="Gul turini tanlang">
-        {TYPES.map(t => (
-          <button
-            key={t}
-            onClick={() => { onChange(t); setOpen(false) }}
-            className={`flex items-center justify-between w-full px-5 py-4 text-base font-medium transition-colors ${
-              t === value ? 'text-primary bg-blue-bg' : 'text-ctext hover:bg-cbg'
-            }`}
-          >
-            {t}
-            {t === value && <Check size={16} />}
-          </button>
-        ))}
-      </BottomModal>
-    </>
-  )
-}
-
 // ── Bir gul kartasi ───────────────────────────────────────────────
 function FlowerCard({ flower, onChange, onRemove, canRemove }) {
   const toggleSize = (sm) => {
@@ -101,7 +67,7 @@ function FlowerCard({ flower, onChange, onRemove, canRemove }) {
       {/* Gul turi + o'chirish */}
       <div className="flex items-center border-b border-separator">
         <div className="flex-1">
-          <TypeSelect value={flower.type} onChange={v => onChange({ ...flower, type: v })} />
+          <FlowerTypeSelect value={flower.type} onChange={v => onChange({ ...flower, type: v })} />
         </div>
         {canRemove && (
           <button
@@ -173,7 +139,6 @@ export default function PartiyaYuborish() {
   const [kassalar, setKassalar] = useState([])
   const [kassaId, setKassaId]   = useState(null)
   const [flowers, setFlowers]   = useState([newFlower()])
-  const [photo, setPhoto]       = useState(null)
   const [sending, setSending]   = useState(false)
   const [error, setError]       = useState('')
 
@@ -194,7 +159,6 @@ export default function PartiyaYuborish() {
     if (flowers.some(f => !f.type))       return setError('Har bir gulning turini tanlang')
     if (flowers.some(f => f.sizes.length === 0)) return setError("Har bir gulda kamida bitta o'lcham bo'lishi kerak")
     if (flowers.some(f => f.sizes.some(s => !(parseInt(s.qty) > 0)))) return setError("Sonlarni to'liq kiriting")
-    if (!photo)                           return setError('Rasm majburiy')
 
     const payload = flowers.map(({ type, sizes }) => ({
       type,
@@ -203,11 +167,7 @@ export default function PartiyaYuborish() {
 
     setError(''); setSending(true)
     try {
-      const form = new FormData()
-      form.append('kassaId', kassaId)
-      form.append('flowers', JSON.stringify(payload))
-      form.append('photo', photo)
-      await api.postForm('/api/partiya', form)
+      await api.post('/api/partiya', { kassaId, flowers: payload })
       navigate('/teplitsa')
     } catch (e) {
       setError(e.message)
@@ -267,22 +227,6 @@ export default function PartiyaYuborish() {
           <p className="text-2xl font-bold text-primary">{totalQty} <span className="text-base font-medium">ta</span></p>
         </div>
       )}
-
-      {/* Rasm */}
-      <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Rasm (majburiy)</p>
-      <label className={`flex flex-col items-center justify-center h-40 rounded-2xl border-2 border-dashed cursor-pointer transition-colors mb-5 overflow-hidden ${
-        photo ? 'border-primary' : 'border-cborder bg-ccard hover:border-primary'
-      }`}>
-        {photo ? (
-          <img src={URL.createObjectURL(photo)} className="h-full w-full object-cover" alt="" />
-        ) : (
-          <div className="text-center px-4">
-            <p className="text-text-sub text-sm">Yuborilayotgan gul rasmini yuklang</p>
-            <p className="text-xs text-cgray mt-1">JPG, PNG — majburiy</p>
-          </div>
-        )}
-        <input type="file" accept="image/*" className="hidden" onChange={e => setPhoto(e.target.files[0] || null)} />
-      </label>
 
       <button
         onClick={onSend}

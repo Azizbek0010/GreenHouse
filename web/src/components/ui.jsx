@@ -1,7 +1,4 @@
 // Shared UI компоненты — Badge, StatCard, кнопки
-import { useState } from 'react'
-import { ImageOff } from 'lucide-react'
-import { API_URL } from '../lib/config'
 
 const BADGE = {
   yolda:         { bg: 'bg-blue-bg',   text: 'text-[#2c5282] dark:text-[#93c5fd]', dot: 'bg-[#2c5282] dark:bg-[#93c5fd]', label: "Yo'lda" },
@@ -96,28 +93,6 @@ export function Spinner() {
     <div className="flex justify-center py-10">
       <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
-  )
-}
-
-// Rasm ko'rsatadi; yo'q bo'lsa yoki yuklanmasa → "Rasm yo'q" placeholder
-export function SafeImg({ src, className = 'w-full h-44' }) {
-  const [err, setErr] = useState(false)
-  const url = src ? (src.startsWith('http') ? src : `${API_URL}${src}`) : null
-  if (!url || err) {
-    return (
-      <div className={`${className} flex flex-col items-center justify-center gap-2 bg-cbg border-b border-cborder`}>
-        <ImageOff size={22} className="text-cgray" />
-        <span className="text-xs text-cgray font-medium">Rasm yo'q</span>
-      </div>
-    )
-  }
-  return (
-    <img
-      src={url}
-      alt=""
-      className={`${className} object-cover`}
-      onError={() => setErr(true)}
-    />
   )
 }
 

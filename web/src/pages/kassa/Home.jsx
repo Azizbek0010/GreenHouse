@@ -3,12 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight, HandCoins } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
 import { StatCard, Badge, PrimaryButton, Spinner, ErrorMsg } from '../../components/ui'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
-function imgSrc(src) { if (!src) return null; return src.startsWith('http') ? src : `${API_URL}${src}` }
 function summarize(flowers = []) {
   return flowers.map(f => {
     const total = f.sizes.reduce((s, x) => s + x.qty, 0)

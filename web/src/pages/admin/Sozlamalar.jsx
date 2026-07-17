@@ -1,69 +1,22 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
-  Sun, Moon, Camera, Eye, EyeOff, Check,
-  ChevronDown, Phone, Lock,
+  Sun, Moon, Eye, EyeOff, Check,
+  ChevronDown, Phone, Lock, Flower2, Plus, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../lib/theme'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
 
 // ── Avatar ──────────────────────────────────────────────────────────
-function AvatarBlock({ user, onUpload }) {
-  const [imgErr, setImgErr]     = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [err, setErr]           = useState('')
-  const fileRef = useRef()
-
-  const handleFile = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    setErr(''); setUploading(true)
-    try {
-      const form = new FormData()
-      form.append('avatar', file)
-      const data = await api.patchForm('/api/auth/profile', form)
-      onUpload(data.user?.avatar || data.avatar)
-      setImgErr(false)
-    } catch (e) { setErr(e.message) }
-    finally { setUploading(false) }
-  }
-
-  const src = user?.avatar && !imgErr ? `${API_URL}${user.avatar}` : null
-
+function AvatarBlock({ user }) {
   return (
     <div className="flex items-center gap-4 px-4 py-5">
-      <div className="relative shrink-0">
-        {src ? (
-          <img src={src} className="w-16 h-16 rounded-full object-cover" alt="" onError={() => setImgErr(true)} />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold">
-            {(user?.name || '?').charAt(0).toUpperCase()}
-          </div>
-        )}
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="absolute bottom-0 right-0 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-white shadow hover:opacity-90 transition-opacity"
-        >
-          {uploading
-            ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            : <Camera size={11} />
-          }
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold shrink-0">
+        {(user?.name || '?').charAt(0).toUpperCase()}
       </div>
-
       <div className="min-w-0">
         <p className="text-base font-bold text-ctext leading-tight">{user?.name}</p>
         <p className="text-sm text-text-sub capitalize mt-0.5">{user?.role}</p>
-        {err && <p className="text-xs text-cred mt-1">{err}</p>}
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="text-xs text-primary font-medium mt-1 hover:underline"
-        >
-          Rasmni o'zgartirish
-        </button>
       </div>
     </div>
   )
@@ -80,9 +33,7 @@ function NameForm({ user, onSave }) {
     if (!name.trim()) return setErr('Ismni kiriting')
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('name', name.trim())
-      const data = await api.patchForm('/api/auth/profile', form)
+      const data = await api.patch('/api/auth/profile', { name: name.trim() })
       onSave(data.user)
       setMsg('Saqlandi!'); setTimeout(() => setMsg(''), 2000)
     } catch (e) { setErr(e.message) }
@@ -133,7 +84,7 @@ function AccordionRow({ icon: Icon, label, sublabel, children }) {
         />
       </button>
 
-      <div className={`overflow-hidden transition-all duration-200 ${open ? 'max-h-[500px]' : 'max-h-0'}`}>
+      <div className={`overflow-hidden transition-all duration-200 ${open ? 'max-h-[1200px]' : 'max-h-0'}`}>
         <div className="px-4 pb-4 pt-1 border-t border-separator bg-cbg/40">
           {children}
         </div>
@@ -153,9 +104,7 @@ function LoginForm({ user, onSave }) {
     if (phone.length !== 9) return setErr("Telefon 9 raqam bo'lishi kerak")
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('phone', '+998' + phone)
-      const data = await api.patchForm('/api/auth/profile', form)
+      const data = await api.patch('/api/auth/profile', { phone: '+998' + phone })
       onSave(data.user)
       setMsg('Login yangilandi!'); setTimeout(() => setMsg(''), 2500)
     } catch (e) { setErr(e.message) }
@@ -207,10 +156,7 @@ function PasswordForm() {
     if (nw !== cnf)    return setErr('Parollar mos emas')
     setErr(''); setLoading(true)
     try {
-      const form = new FormData()
-      form.append('currentPassword', cur)
-      form.append('newPassword', nw)
-      await api.patchForm('/api/auth/profile', form)
+      await api.patch('/api/auth/profile', { currentPassword: cur, newPassword: nw })
       setMsg("Parol o'zgartirildi!"); setCur(''); setNw(''); setCnf('')
       setTimeout(() => setMsg(''), 2500)
     } catch (e) { setErr(e.message) }
@@ -264,6 +210,103 @@ function PasswordForm() {
   )
 }
 
+// ── Gul turlari (bazadan, hamma rollarda ko'rinadi) ──────────────────
+function FlowerTypesManager() {
+  const [types, setTypes]     = useState([])
+  const [name, setName]       = useState('')
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding]   = useState(false)
+  const [armedId, setArmedId] = useState(null)   // ikki bosqichli o'chirish
+  const [err, setErr]         = useState('')
+
+  const load = () => {
+    api.get('/api/flower-types')
+      .then(setTypes)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!armedId) return
+    const t = setTimeout(() => setArmedId(null), 3000)
+    return () => clearTimeout(t)
+  }, [armedId])
+
+  const add = async () => {
+    if (!name.trim()) return
+    setAdding(true); setErr('')
+    try {
+      await api.post('/api/flower-types', { name: name.trim() })
+      setName('')
+      load()
+    } catch (e) { setErr(e.message) }
+    finally { setAdding(false) }
+  }
+
+  const del = async (id) => {
+    if (armedId !== id) return setArmedId(id)
+    setErr('')
+    try {
+      await api.del(`/api/flower-types/${id}`)
+      setArmedId(null)
+      load()
+    } catch (e) { setErr(e.message) }
+  }
+
+  return (
+    <div className="space-y-3 pt-2">
+      {err && <p className="text-xs text-cred">{err}</p>}
+
+      {/* Yangi tur qo'shish */}
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add() }}
+          placeholder="Yangi gul turi nomi"
+          className="flex-1 h-11 px-3 rounded-xl border border-cborder bg-ccard text-ctext text-sm outline-none focus:border-primary transition-colors"
+        />
+        <button
+          onClick={add}
+          disabled={adding || !name.trim()}
+          className="h-11 px-4 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-1.5"
+        >
+          <Plus size={15} /> Qo'shish
+        </button>
+      </div>
+
+      {/* Ro'yxat */}
+      {loading ? (
+        <p className="text-xs text-text-sub py-2">Yuklanmoqda...</p>
+      ) : (
+        <div className="bg-ccard border border-cborder rounded-xl overflow-hidden">
+          {types.map((t, i) => (
+            <div key={t._id} className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? 'border-t border-separator' : ''}`}>
+              <span className="text-sm font-medium text-ctext">{t.name}</span>
+              <button
+                onClick={() => del(t._id)}
+                className={`flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors ${
+                  armedId === t._id ? 'bg-cred text-white' : 'text-cred hover:bg-red-bg'
+                }`}
+              >
+                <Trash2 size={13} />
+                {armedId === t._id ? "O'chirilsinmi?" : ''}
+              </button>
+            </div>
+          ))}
+          {types.length === 0 && <p className="text-xs text-text-sub p-3">Turlar yo'q</p>}
+        </div>
+      )}
+      <p className="text-xs text-text-sub">
+        Qo'shilgan tur teplitsa va kassadagi tanlash ro'yxatida darhol ko'rinadi.
+        O'chirilgan tur eski yozuvlarda saqlanib qoladi.
+      </p>
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 export default function AdminSozlamalar() {
   const { dark, toggle } = useTheme()
@@ -276,7 +319,7 @@ export default function AdminSozlamalar() {
       {/* ── Profil ── */}
       <p className="text-xs font-semibold text-text-sub uppercase tracking-wider px-1 mb-2">Profil</p>
       <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
-        <AvatarBlock user={user} onUpload={(avatar) => updateUser({ avatar })} />
+        <AvatarBlock user={user} />
         <div className="border-t border-separator">
           <NameForm user={user} onSave={(u) => updateUser(u)} />
         </div>
@@ -301,6 +344,18 @@ export default function AdminSozlamalar() {
           sublabel="Hisob xavfsizligini oshiring"
         >
           <PasswordForm />
+        </AccordionRow>
+      </div>
+
+      {/* ── Gul turlari ── */}
+      <p className="text-xs font-semibold text-text-sub uppercase tracking-wider px-1 mb-2">Gul turlari</p>
+      <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
+        <AccordionRow
+          icon={Flower2}
+          label="Gul turlarini boshqarish"
+          sublabel="Qo'shilgan tur hamma panellarda ko'rinadi"
+        >
+          <FlowerTypesManager />
         </AccordionRow>
       </div>
 

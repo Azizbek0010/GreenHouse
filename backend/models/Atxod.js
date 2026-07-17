@@ -6,7 +6,6 @@ const atxodSchema = new mongoose.Schema({
   razmer:     { type: Number, required: true },
   qty:        { type: Number, required: true },
   sabab:      { type: String, enum: ["so'lgan", 'nuqsonli', 'singan', 'boshqa'], required: true },
-  photo:      { type: String, required: true },
   qiymat:     { type: Number, default: 0 },
   status:     { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   adminNote:  { type: String, default: null },

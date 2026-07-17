@@ -1,23 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, CheckCircle, AlertCircle, ImageOff, X, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Clock, CheckCircle, AlertCircle, ShieldCheck, Pencil } from 'lucide-react'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
-import { Badge, Spinner, ErrorMsg } from '../../components/ui'
-
-function PhotoModal({ src, onClose }) {
-  if (!src) return null
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-      onClick={onClose}>
-      <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white">
-        <X size={28} />
-      </button>
-      <img src={src} className="max-w-full max-h-full object-contain rounded-xl"
-        onClick={e => e.stopPropagation()} alt="" />
-    </div>
-  )
-}
+import { Badge, Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../components/ui'
+import { DeleteButton } from '../../components/AdminEdit'
+import BottomModal from '../../components/BottomModal'
+import FlowerListEditor from '../../components/FlowerListEditor'
 
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 function buildRows(sent = [], received = []) {
@@ -35,35 +23,46 @@ function buildRows(sent = [], received = []) {
     .sort((a, b) => a.type.localeCompare(b.type) || a.sm - b.sm)
 }
 
-function SafeImg({ src, alt = '', className, onClick }) {
-  const [err, setErr] = useState(false)
-  if (!src || err) {
-    return (
-      <div className={`${className} flex flex-col items-center justify-center gap-2 bg-cbg`}>
-        <ImageOff size={28} className="text-cgray" />
-        <span className="text-xs text-cgray">Rasm yo'q</span>
-      </div>
-    )
-  }
-  return (
-    <img
-      src={src.startsWith('http') ? src : `${API_URL}${src}`}
-      alt={alt}
-      className={className}
-      onClick={onClick}
-      onError={() => setErr(true)}
-    />
-  )
-}
-
 export default function FarqDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [p, setP]             = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
-  const [modalSrc, setModalSrc] = useState(null)
   const [confirming, setConfirming] = useState(false)
+
+  // Admin edit/delete
+  const [editOpen, setEditOpen]       = useState(false)
+  const [editSent, setEditSent]       = useState([])
+  const [editReceived, setEditReceived] = useState([])
+  const [saving, setSaving]           = useState(false)
+  const [deleting, setDeleting]       = useState(false)
+
+  function openEdit() {
+    setEditSent(JSON.parse(JSON.stringify(p.sent || [])))
+    setEditReceived(JSON.parse(JSON.stringify(p.received || [])))
+    setEditOpen(true)
+  }
+
+  async function handleSave() {
+    setSaving(true); setError('')
+    try {
+      const body = { sent: editSent }
+      if (p.status !== 'yolda') body.received = editReceived
+      const updated = await api.patch(`/api/partiya/${id}`, body)
+      setP(updated)
+      setEditOpen(false)
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete() {
+    setDeleting(true); setError('')
+    try {
+      await api.del(`/api/partiya/${id}`)
+      navigate(-1)
+    } catch (e) { setError(e.message); setDeleting(false) }
+  }
 
   async function handleConfirm() {
     setConfirming(true)
@@ -75,11 +74,6 @@ export default function FarqDetail() {
     } finally {
       setConfirming(false)
     }
-  }
-
-  function fullSrc(src) {
-    if (!src) return null
-    return src.startsWith('http') ? src : `${API_URL}${src}`
   }
 
   useEffect(() => {
@@ -188,42 +182,30 @@ export default function FarqDetail() {
             </>
           )}
 
-          {/* Оба фото */}
-          {(p?.sentPhoto || p?.photo) && (
-            <div className="mt-5">
-              <div className={`grid gap-4 ${p?.sentPhoto && p?.photo ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                {p?.sentPhoto && (
-                  <div>
-                    <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
-                      Teplitsa yubordi
-                    </p>
-                    <SafeImg
-                      src={p.sentPhoto}
-                      alt="Teplitsa rasm"
-                      className="w-full h-52 object-cover rounded-2xl cursor-zoom-in"
-                      onClick={() => setModalSrc(fullSrc(p.sentPhoto))}
-                    />
-                  </div>
-                )}
-                {p?.photo && (
-                  <div>
-                    <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
-                      Kassa qabul qildi
-                    </p>
-                    <SafeImg
-                      src={p.photo}
-                      alt="Kassa rasm"
-                      className="w-full h-52 object-cover rounded-2xl cursor-zoom-in"
-                      onClick={() => setModalSrc(fullSrc(p.photo))}
-                    />
-                  </div>
-                )}
-              </div>
+          {/* Admin: tahrirlash / o'chirish */}
+          {p && (
+            <div className="space-y-3 mt-4">
+              <OutlineButton title="Tahrirlash" icon={<Pencil size={17} />} onClick={openEdit} />
+              <DeleteButton onConfirm={handleDelete} loading={deleting} label="Partiyani o'chirish" />
             </div>
           )}
-          <PhotoModal src={modalSrc} onClose={() => setModalSrc(null)} />
         </>
       )}
+
+      <BottomModal open={editOpen} onClose={() => setEditOpen(false)} title="Partiyani tahrirlash">
+        <div className="pt-4 space-y-4">
+          <FlowerListEditor flowers={editSent} onChange={setEditSent} label="Yuborilgan (Teplitsa)" />
+          {p?.status !== 'yolda' && (
+            <FlowerListEditor flowers={editReceived} onChange={setEditReceived} label="Qabul qilingan (Kassa)" />
+          )}
+          <p className="text-xs text-text-sub px-5">
+            Saqlashda farq va status avtomatik qayta hisoblanadi.
+          </p>
+          <div className="px-5">
+            <PrimaryButton title="Saqlash" onClick={handleSave} loading={saving} />
+          </div>
+        </div>
+      </BottomModal>
     </div>
   )
 }

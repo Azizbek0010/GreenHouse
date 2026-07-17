@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Lock, Package, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '../../lib/api'
-import { API_URL } from '../../lib/config'
-import { Spinner, EmptyState, ErrorMsg, Badge, SafeImg } from '../../components/ui'
+import { Spinner, EmptyState, ErrorMsg, Badge } from '../../components/ui'
 
 const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 
@@ -57,13 +56,6 @@ function PartiyaCard({ p }) {
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-3 p-4 text-left"
       >
-        {p.sentPhoto && (
-          <img
-            src={`${API_URL}${p.sentPhoto}`}
-            className="w-14 h-14 rounded-xl object-cover shrink-0"
-            alt=""
-          />
-        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-bold text-ctext">{formatBatchId(p.batchId)}</p>
@@ -81,7 +73,6 @@ function PartiyaCard({ p }) {
 
       {expanded && (
         <div className="border-t border-separator">
-          <SafeImg src={p.sentPhoto} className="w-full max-h-64 object-cover" />
           <div className="px-4 py-3">
             <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan gullar</p>
             <div className="space-y-2">

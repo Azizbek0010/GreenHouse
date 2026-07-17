@@ -7,12 +7,12 @@ const sotuvSchema = new mongoose.Schema({
   qty:         { type: Number, required: true },
   holat:       { type: String, enum: ['yaxshi', 'nuqsonli'], default: 'yaxshi' },
   pricePerUnit:{ type: Number, required: true },
+  discountPrice: { type: Number, default: null },   // chegirma bilan yakuniy narx (ixtiyoriy)
   totalPrice:  { type: Number },
-  photo:       { type: String, default: null },
 }, { timestamps: true })
 
 sotuvSchema.pre('save', function () {
-  this.totalPrice = this.pricePerUnit * this.qty
+  this.totalPrice = this.discountPrice != null ? this.discountPrice : this.pricePerUnit * this.qty
 })
 
 sotuvSchema.index({ kassa: 1, createdAt: -1 })
