@@ -72,7 +72,7 @@ export default function Login() {
               type="tel"
               value={formatPhone(phone)}
               onChange={onChangePhone}
-              placeholder="90 123 45 67"
+              placeholder="90 000 00 00"
               maxLength={12}
               className="flex-1 bg-transparent text-ctext text-base outline-none placeholder:text-[#c7c7cc]"
             />
