@@ -371,8 +371,9 @@ function QarzlarTab({ list, sum, onChanged }) {
 }
 
 // ── Partiyalar tab ────────────────────────────────────────────────────
-function summarize(flowers = []) {
-  return flowers.map(f => `${f.type} (${f.sizes.reduce((s, x) => s + x.qty, 0)} ta)`).join(', ')
+function summarize(p) {
+  if (p.sentTotal != null) return `${p.sentTotal} ta`
+  return (p.sent || []).map(f => `${f.type} (${f.sizes.reduce((s, x) => s + x.qty, 0)} ta)`).join(', ')
 }
 
 function PartiyaCard({ p }) {
@@ -389,7 +390,7 @@ function PartiyaCard({ p }) {
           <Badge status={p.status} />
         </div>
         <p className="text-sm text-text-sub">{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'}</p>
-        <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent)}</p>
+        <p className="text-xs text-text-sub mt-0.5">{summarize(p)}</p>
         <p className="text-xs text-text-sub/60 mt-1">{soat(p.createdAt)}</p>
 
         {/* Развернуть детали */}
@@ -402,7 +403,12 @@ function PartiyaCard({ p }) {
 
       {expanded && (
         <div className="border-t border-separator px-4 py-3 space-y-2">
-          {(p.sent || []).map((f, i) => (
+          {p.sentTotal != null ? (
+            <div className="bg-cbg rounded-xl px-3 py-2.5 flex items-center justify-between">
+              <span className="text-sm text-text-sub">Yuborilgan</span>
+              <span className="text-sm font-bold text-ctext">{p.sentTotal} ta</span>
+            </div>
+          ) : (p.sent || []).map((f, i) => (
             <div key={i} className="bg-cbg rounded-xl px-3 py-2.5">
               <p className="text-sm font-semibold text-ctext mb-1.5">{f.type}</p>
               <div className="flex flex-wrap gap-1.5">
@@ -414,6 +420,12 @@ function PartiyaCard({ p }) {
               </div>
             </div>
           ))}
+          {p.sentTotal != null && p.farqSoni != null && p.farqSoni !== 0 && (
+            <div className="flex items-center justify-between bg-red-bg/40 border border-cred/20 rounded-xl px-3 py-2">
+              <span className="text-xs text-ctext font-medium">Farq (soni)</span>
+              <span className="text-xs text-cred font-semibold">{p.farqSoni > 0 ? '+' : ''}{p.farqSoni} ta</span>
+            </div>
+          )}
           {p.farq && p.farq.length > 0 && (
             <>
               <p className="text-xs font-semibold text-cred uppercase tracking-wider pt-1">Farqlar</p>

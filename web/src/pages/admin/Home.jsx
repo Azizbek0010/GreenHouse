@@ -14,8 +14,10 @@ const PERIODS = [
 
 const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
-function summarize(flowers = []) {
-  return flowers.map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
+function summarize(p) {
+  // YANGI rejim: umumiy son. ESKI rejim: tur+razmer.
+  if (p.sentTotal != null) return `${p.sentTotal} ta`
+  return (p.sent || []).map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
 }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 function dateKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}` }
@@ -52,7 +54,7 @@ function PartiyaCard({ p, onClick }) {
           <Badge status={p.status} />
         </div>
         <p className="text-sm text-text-sub">{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'}</p>
-        <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
+        <p className="text-xs text-text-sub mt-0.5">{summarize(p) || '—'}</p>
         <p className="text-xs text-text-sub/60 mt-0.5">{new Date(p.createdAt).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit' })} · {new Date(p.createdAt).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' })}</p>
 
         {p.farq?.length > 0 && (

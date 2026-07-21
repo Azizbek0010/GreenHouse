@@ -15,9 +15,11 @@ const partiyaSchema = new mongoose.Schema({
   teplitsa:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   kassa:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   status:    { type: String, enum: ['yolda', 'qabul_qilindi', 'farq_bor'], default: 'yolda' },
-  sent:      [flowerSchema],
+  sentTotal: { type: Number, default: null }, // YANGI rejim: teplitsa yuborgan umumiy soni (tur/razmersiz)
+  sent:      [flowerSchema],                  // ESKI rejim: tur+razmer bo'yicha (legacy partiyalar uchun)
   received:  [flowerSchema],
-  farq:      { type: Array, default: [] },
+  farq:      { type: Array, default: [] },    // ESKI rejim: per-type farq (legacy)
+  farqSoni:  { type: Number, default: null }, // YANGI rejim: raqamli farq (qabul jami − sentTotal)
 }, { timestamps: true })
 
 partiyaSchema.pre('save', async function () {

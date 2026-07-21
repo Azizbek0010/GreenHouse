@@ -13,8 +13,10 @@ const FILTERS = [
 
 const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 
-function summarize(flowers = []) {
-  return flowers.map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
+function summarize(p) {
+  // YANGI rejim: umumiy son. ESKI rejim: tur+razmer.
+  if (p.sentTotal != null) return `${p.sentTotal} ta`
+  return (p.sent || []).map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
 }
 function soat(d) {
   return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -122,7 +124,7 @@ export default function AdminPartiyalar() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
-                      <p className="text-xs text-text-sub mt-0.5">{summarize(p.sent) || '—'}</p>
+                      <p className="text-xs text-text-sub mt-0.5">{summarize(p) || '—'}</p>
                       <p className="text-xs text-[#9aa0a8] mt-0.5">
                         {p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'} · {soat(p.createdAt)}
                       </p>

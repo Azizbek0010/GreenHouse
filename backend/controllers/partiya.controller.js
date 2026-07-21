@@ -19,9 +19,11 @@ function validateFlowers(flowers) {
 
 exports.create = async (req, res, next) => {
   try {
-    const { kassaId, flowers } = req.body
-    const flowersError = validateFlowers(flowers)
-    if (flowersError) return res.status(400).json({ message: flowersError })
+    const { kassaId, soni } = req.body
+    // Teplitsa endi faqat umumiy sonni yuboradi (tur/razmersiz)
+    const soniNum = Number(soni)
+    if (!Number.isInteger(soniNum) || soniNum <= 0)
+      return res.status(400).json({ message: 'Gullar soni musbat butun son bo\'lishi kerak' })
 
     const kassa = await User.findById(kassaId)
     if (!kassa || kassa.role !== 'kassa')
@@ -30,7 +32,7 @@ exports.create = async (req, res, next) => {
     const partiya = await Partiya.create({
       teplitsa:  req.user.id,
       kassa:     kassaId,
-      sent:      flowers,
+      sentTotal: soniNum,
     })
 
     if (kassa.expoPushToken) {
@@ -74,8 +76,16 @@ exports.receive = async (req, res, next) => {
     if (partiya.status !== 'yolda') return res.status(400).json({ message: 'Partiya allaqachon qabul qilingan' })
 
     partiya.received = flowers
-    partiya.farq = calcFarq(partiya.sent, flowers)
-    partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
+    if (partiya.sentTotal != null) {
+      // YANGI rejim: farq faqat umumiy son bo'yicha
+      const receivedTotal = flowers.reduce((s, f) => s + f.sizes.reduce((a, x) => a + x.qty, 0), 0)
+      partiya.farqSoni = receivedTotal - partiya.sentTotal
+      partiya.status   = partiya.farqSoni === 0 ? 'qabul_qilindi' : 'farq_bor'
+    } else {
+      // ESKI rejim (legacy): per-type farq
+      partiya.farq   = calcFarq(partiya.sent, flowers)
+      partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
+    }
 
     await partiya.save()
 
@@ -92,8 +102,8 @@ exports.receive = async (req, res, next) => {
       status: 'qabul_qilindi',
     })
 
-    // Kassirga sent va farq qaytarilmaydi (blind count)
-    const { sent, farq, ...safe } = partiya.toObject()
+    // Kassirga sent/sentTotal va farq/farqSoni qaytarilmaydi (blind count)
+    const { sent, sentTotal, farq, farqSoni, ...safe } = partiya.toObject()
     res.json(safe)
   } catch (err) {
     next(err)
@@ -115,16 +125,16 @@ exports.getAll = async (req, res, next) => {
 
     if (req.user.role === 'kassa') {
       return res.json(partiyalar.map(p => {
-        const { sent, farq, received, ...safe } = p.toObject()
+        const { sent, sentTotal, farq, farqSoni, received, ...safe } = p.toObject()
         return safe
       }))
     }
 
-    // Teplitsa kassa qanday sanaganini ko'rmaydi (farq/received yashirin).
-    // farq_bor ham "qabul qilindi" sifatida ko'rinadi — farq adminning ishi.
+    // Teplitsa kassa qanday sanaganini ko'rmaydi (farq/farqSoni/received yashirin).
+    // O'zi yuborgan sentTotal ko'rinadi. farq_bor ham "qabul qilindi" sifatida ko'rinadi.
     if (req.user.role === 'teplitsa') {
       return res.json(partiyalar.map(p => {
-        const { farq, received, ...safe } = p.toObject()
+        const { farq, farqSoni, received, ...safe } = p.toObject()
         if (safe.status === 'farq_bor') safe.status = 'qabul_qilindi'
         return safe
       }))
@@ -150,12 +160,12 @@ exports.getOne = async (req, res, next) => {
       return res.status(403).json({ message: 'Ruxsat yo\'q' })
 
     if (req.user.role === 'kassa') {
-      const { sent, farq, received, ...safe } = partiya.toObject()
+      const { sent, sentTotal, farq, farqSoni, received, ...safe } = partiya.toObject()
       return res.json(safe)
     }
 
     if (req.user.role === 'teplitsa') {
-      const { farq, received, ...safe } = partiya.toObject()
+      const { farq, farqSoni, received, ...safe } = partiya.toObject()
       if (safe.status === 'farq_bor') safe.status = 'qabul_qilindi'
       return res.json(safe)
     }
@@ -172,7 +182,15 @@ exports.adminUpdate = async (req, res, next) => {
     const partiya = await Partiya.findById(req.params.id)
     if (!partiya) return res.status(404).json({ message: 'Topilmadi' })
 
-    const { sent, received } = req.body
+    const { sent, received, soni } = req.body
+
+    // YANGI rejim: admin yuborilgan umumiy sonni tahrirlaydi
+    if (soni !== undefined) {
+      const soniNum = Number(soni)
+      if (!Number.isInteger(soniNum) || soniNum <= 0)
+        return res.status(400).json({ message: 'Yuborilgan soni musbat butun son bo\'lishi kerak' })
+      partiya.sentTotal = soniNum
+    }
 
     if (sent !== undefined) {
       const err = validateFlowers(sent)
@@ -190,8 +208,14 @@ exports.adminUpdate = async (req, res, next) => {
 
     // Qabul qilingan partiyada farq va status qayta hisoblanadi
     if (partiya.status !== 'yolda') {
-      partiya.farq = calcFarq(partiya.sent, partiya.received)
-      partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
+      if (partiya.sentTotal != null) {
+        const receivedTotal = (partiya.received || []).reduce((s, f) => s + f.sizes.reduce((a, x) => a + x.qty, 0), 0)
+        partiya.farqSoni = receivedTotal - partiya.sentTotal
+        partiya.status   = partiya.farqSoni === 0 ? 'qabul_qilindi' : 'farq_bor'
+      } else {
+        partiya.farq = calcFarq(partiya.sent, partiya.received)
+        partiya.status = partiya.farq.length > 0 ? 'farq_bor' : 'qabul_qilindi'
+      }
     }
 
     await partiya.save()

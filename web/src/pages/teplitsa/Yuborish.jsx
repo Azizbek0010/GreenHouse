@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Package, Check, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Package, Check, ChevronDown } from 'lucide-react'
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
-import FlowerTypeSelect from '../../components/FlowerTypeSelect'
-import { FLOWER_SIZES as SIZES } from '../../lib/flowers'
 
 // ── Kassa tanlash modal ───────────────────────────────────────────
 function KassaSelect({ kassalar, value, onChange }) {
@@ -41,104 +39,12 @@ function KassaSelect({ kassalar, value, onChange }) {
   )
 }
 
-// ── Bir gul kartasi ───────────────────────────────────────────────
-function FlowerCard({ flower, onChange, onRemove, canRemove }) {
-  const toggleSize = (sm) => {
-    const exists = flower.sizes.find(s => s.sm === sm)
-    onChange({
-      ...flower,
-      sizes: exists
-        ? flower.sizes.filter(s => s.sm !== sm)
-        : [...flower.sizes, { sm, qty: 1 }],
-    })
-  }
-
-  const setQty = (sm, val) => {
-    onChange({
-      ...flower,
-      sizes: flower.sizes.map(s => s.sm === sm ? { ...s, qty: val.replace(/\D/g, '') } : s),
-    })
-  }
-
-  const totalQty = flower.sizes.reduce((s, x) => s + (parseInt(x.qty) || 0), 0)
-
-  return (
-    <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
-      {/* Gul turi + o'chirish */}
-      <div className="flex items-center border-b border-separator">
-        <div className="flex-1">
-          <FlowerTypeSelect value={flower.type} onChange={v => onChange({ ...flower, type: v })} />
-        </div>
-        {canRemove && (
-          <button
-            onClick={onRemove}
-            className="w-12 flex items-center justify-center text-cred hover:bg-red-bg transition-colors self-stretch"
-          >
-            <Trash2 size={16} />
-          </button>
-        )}
-      </div>
-
-      {/* O'lchamlar */}
-      <div className="px-4 py-3 border-b border-separator">
-        <p className="text-xs text-text-sub mb-2 font-medium">O'lcham (sm) — bir nechta tanlang</p>
-        <div className="flex flex-wrap gap-1.5">
-          {SIZES.map(sm => {
-            const active = !!flower.sizes.find(s => s.sm === sm)
-            return (
-              <button
-                key={sm}
-                onClick={() => toggleSize(sm)}
-                className={`px-3 h-8 rounded-lg text-sm font-medium transition-colors border ${
-                  active
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-cbg text-ctext border-cborder hover:border-primary'
-                }`}
-              >
-                {sm}sm
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Tanlangan o'lchamlar uchun soni */}
-      {flower.sizes.length > 0 && (
-        <div className="divide-y divide-separator">
-          {flower.sizes.map(s => (
-            <div key={s.sm} className="flex items-center px-4 py-3">
-              <span className="flex-1 text-sm text-ctext font-medium">{s.sm} sm</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={s.qty}
-                onChange={e => setQty(s.sm, e.target.value)}
-                className="w-20 text-right bg-transparent text-ctext text-base font-semibold outline-none"
-                placeholder="0"
-              />
-              <span className="text-text-sub ml-1.5 text-sm">ta</span>
-            </div>
-          ))}
-          {totalQty > 0 && (
-            <div className="px-4 py-2.5 bg-blue-bg flex items-center justify-between">
-              <span className="text-xs text-primary">{flower.sizes.length} o'lcham</span>
-              <span className="text-sm font-bold text-primary">Jami: {totalQty} ta</span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Main ──────────────────────────────────────────────────────────
-const newFlower = () => ({ id: Date.now() + Math.random(), type: '', sizes: [] })
-
 export default function PartiyaYuborish() {
   const navigate  = useNavigate()
   const [kassalar, setKassalar] = useState([])
   const [kassaId, setKassaId]   = useState(null)
-  const [flowers, setFlowers]   = useState([newFlower()])
+  const [soni, setSoni]         = useState('')
   const [sending, setSending]   = useState(false)
   const [error, setError]       = useState('')
 
@@ -148,26 +54,15 @@ export default function PartiyaYuborish() {
       .catch(e => setError(e.message))
   }, [])
 
-  const updateFlower = (id, updated) => setFlowers(prev => prev.map(f => f.id === id ? updated : f))
-  const removeFlower = (id)          => setFlowers(prev => prev.filter(f => f.id !== id))
-  const addFlower    = ()            => setFlowers(prev => [...prev, newFlower()])
-
-  const totalQty = flowers.reduce((s, f) => s + f.sizes.reduce((ss, x) => ss + (parseInt(x.qty) || 0), 0), 0)
+  const soniNum = parseInt(soni) || 0
 
   const onSend = async () => {
-    if (!kassaId)                         return setError('Kassani tanlang')
-    if (flowers.some(f => !f.type))       return setError('Har bir gulning turini tanlang')
-    if (flowers.some(f => f.sizes.length === 0)) return setError("Har bir gulda kamida bitta o'lcham bo'lishi kerak")
-    if (flowers.some(f => f.sizes.some(s => !(parseInt(s.qty) > 0)))) return setError("Sonlarni to'liq kiriting")
-
-    const payload = flowers.map(({ type, sizes }) => ({
-      type,
-      sizes: sizes.map(s => ({ sm: s.sm, qty: parseInt(s.qty) })),
-    }))
+    if (!kassaId)        return setError('Kassani tanlang')
+    if (!(soniNum > 0))  return setError('Gullar sonini kiriting')
 
     setError(''); setSending(true)
     try {
-      await api.post('/api/partiya', { kassaId, flowers: payload })
+      await api.post('/api/partiya', { kassaId, soni: soniNum })
       navigate('/teplitsa')
     } catch (e) {
       setError(e.message)
@@ -182,7 +77,7 @@ export default function PartiyaYuborish() {
         <ArrowLeft size={16} /> Ortga
       </button>
       <h1 className="text-2xl font-bold text-ctext tracking-tight mb-1">Partiya yuborish</h1>
-      <p className="text-sm text-text-sub mb-5">Qaysi kassaga va qancha gul yuborishni kiriting</p>
+      <p className="text-sm text-text-sub mb-5">Qaysi kassaga va nechta gul yuborishni kiriting</p>
 
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
@@ -196,37 +91,22 @@ export default function PartiyaYuborish() {
         )}
       </div>
 
-      {/* Gullar */}
-      <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilayotgan gullar</p>
-
-      {flowers.map(f => (
-        <FlowerCard
-          key={f.id}
-          flower={f}
-          onChange={updated => updateFlower(f.id, updated)}
-          onRemove={() => removeFlower(f.id)}
-          canRemove={flowers.length > 1}
-        />
-      ))}
-
-      <button
-        onClick={addFlower}
-        className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-semibold hover:border-primary hover:text-primary transition-colors mb-5"
-      >
-        <Plus size={16} />
-        Gul qo'shish
-      </button>
-
-      {/* Total */}
-      {totalQty > 0 && (
-        <div className="bg-blue-bg border border-primary/20 rounded-2xl p-4 flex items-center justify-between mb-5">
-          <div>
-            <p className="text-sm text-primary font-semibold">Jami yuboriladi</p>
-            <p className="text-xs text-primary/70 mt-0.5">{flowers.length} tur gul</p>
-          </div>
-          <p className="text-2xl font-bold text-primary">{totalQty} <span className="text-base font-medium">ta</span></p>
+      {/* Gullar soni */}
+      <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Nechta gul?</p>
+      <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
+        <div className="flex items-center px-4 py-4">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={soni}
+            onChange={e => setSoni(e.target.value.replace(/\D/g, ''))}
+            className="flex-1 bg-transparent text-ctext text-2xl font-bold outline-none placeholder:text-text-sub placeholder:font-normal placeholder:text-base"
+            placeholder="Masalan: 1000"
+            autoFocus
+          />
+          <span className="text-text-sub ml-2 text-base font-medium">ta</span>
         </div>
-      )}
+      </div>
 
       <button
         onClick={onSend}

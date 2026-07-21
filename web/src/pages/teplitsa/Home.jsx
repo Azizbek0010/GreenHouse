@@ -5,14 +5,17 @@ import { api } from '../../lib/api'
 import { StatCard, Badge, PrimaryButton, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
-function summarize(flowers = []) {
-  return flowers.map(f => {
+// YANGI rejim: p.sentTotal (raqam). ESKI rejim: p.sent (tur+razmer).
+function partiyaTotal(p) {
+  if (p.sentTotal != null) return p.sentTotal
+  return (p.sent || []).reduce((sum, f) => sum + f.sizes.reduce((a, s) => a + s.qty, 0), 0)
+}
+function summarize(p) {
+  if (p.sentTotal != null) return `${p.sentTotal} ta`
+  return (p.sent || []).map(f => {
     const total = f.sizes.reduce((sum, s) => sum + s.qty, 0)
     return `${f.type} ${total}ta`
   }).join(', ')
-}
-function flowerCount(flowers = []) {
-  return flowers.reduce((sum, f) => sum + f.sizes.reduce((a, s) => a + s.qty, 0), 0)
 }
 function isToday(d) {
   const x = new Date(d), n = new Date()
@@ -35,7 +38,7 @@ export default function TeplitsaHome() {
   useEffect(() => { load() }, [load])
 
   const todayCount   = partiyalar.filter(p => isToday(p.createdAt)).length
-  const totalFlowers = partiyalar.reduce((sum, p) => sum + flowerCount(p.sent), 0)
+  const totalFlowers = partiyalar.reduce((sum, p) => sum + partiyaTotal(p), 0)
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -83,7 +86,7 @@ export default function TeplitsaHome() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
                 <p className="text-xs text-text-sub mt-0.5">
-                  {summarize(p.sent)} → {p.kassa?.name || 'Kassa'}
+                  {summarize(p)} → {p.kassa?.name || 'Kassa'}
                 </p>
               </div>
               <Badge status={p.status} />

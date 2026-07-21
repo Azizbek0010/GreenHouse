@@ -37,7 +37,12 @@ function formatBatchId(id = '') {
   return id.replace(/^BATCH-/, 'PARTIYA-')
 }
 
-function FlowerSummary({ sent = [] }) {
+function FlowerSummary({ p }) {
+  // YANGI rejim: faqat umumiy son
+  if (p.sentTotal != null) {
+    return <p className="text-xs text-text-sub mt-1">Jami {p.sentTotal} ta</p>
+  }
+  const sent = p.sent || []
   const total = sent.reduce((s, f) => s + f.sizes.reduce((ss, x) => ss + x.qty, 0), 0)
   if (total === 0) return null
   return (
@@ -62,7 +67,7 @@ function PartiyaCard({ p }) {
             <Badge status={p.status} />
           </div>
           <p className="text-xs text-text-sub mt-0.5">{p.kassa?.name || 'Kassa'}</p>
-          <FlowerSummary sent={p.sent} />
+          <FlowerSummary p={p} />
           <p className="text-xs text-text-sub/60 mt-1">{soat(p.createdAt)}</p>
         </div>
         {expanded
@@ -75,6 +80,11 @@ function PartiyaCard({ p }) {
         <div className="border-t border-separator">
           <div className="px-4 py-3">
             <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan gullar</p>
+            {p.sentTotal != null ? (
+              <div className="bg-cbg rounded-xl px-3 py-3 text-center">
+                <p className="text-2xl font-bold text-ctext">{p.sentTotal} <span className="text-base font-medium text-text-sub">ta</span></p>
+              </div>
+            ) : (
             <div className="space-y-2">
               {(p.sent || []).map((f, i) => (
                 <div key={i} className="bg-cbg rounded-xl px-3 py-2.5">
@@ -89,6 +99,7 @@ function PartiyaCard({ p }) {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       )}

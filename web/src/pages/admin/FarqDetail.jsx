@@ -8,6 +8,9 @@ import BottomModal from '../../components/BottomModal'
 import FlowerListEditor from '../../components/FlowerListEditor'
 
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
+function totalOf(flowers = []) {
+  return flowers.reduce((s, f) => s + f.sizes.reduce((a, x) => a + x.qty, 0), 0)
+}
 function buildRows(sent = [], received = []) {
   const map = new Map()
   const key = (t, s) => `${t}|${s}`
@@ -33,12 +36,16 @@ export default function FarqDetail() {
 
   // Admin edit/delete
   const [editOpen, setEditOpen]       = useState(false)
+  const [editSoni, setEditSoni]       = useState('')
   const [editSent, setEditSent]       = useState([])
   const [editReceived, setEditReceived] = useState([])
   const [saving, setSaving]           = useState(false)
   const [deleting, setDeleting]       = useState(false)
 
+  const isTotalMode = !!(p && p.sentTotal != null)
+
   function openEdit() {
+    setEditSoni(p.sentTotal != null ? String(p.sentTotal) : '')
     setEditSent(JSON.parse(JSON.stringify(p.sent || [])))
     setEditReceived(JSON.parse(JSON.stringify(p.received || [])))
     setEditOpen(true)
@@ -47,7 +54,7 @@ export default function FarqDetail() {
   async function handleSave() {
     setSaving(true); setError('')
     try {
-      const body = { sent: editSent }
+      const body = isTotalMode ? { soni: parseInt(editSoni) || 0 } : { sent: editSent }
       if (p.status !== 'yolda') body.received = editReceived
       const updated = await api.patch(`/api/partiya/${id}`, body)
       setP(updated)
@@ -83,8 +90,21 @@ export default function FarqDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
-  const rows    = p ? buildRows(p.sent, p.received) : []
-  const hasFarq = rows.some(r => r.diff !== 0)
+  const rows          = (p && !isTotalMode) ? buildRows(p.sent, p.received) : []
+  const receivedTotal = totalOf(p?.received)
+  const farqSoni      = p?.farqSoni != null ? p.farqSoni : (receivedTotal - (p?.sentTotal || 0))
+  const hasFarq       = isTotalMode ? farqSoni !== 0 : rows.some(r => r.diff !== 0)
+
+  const confirmBtn = p?.status === 'farq_bor' && (
+    <button
+      onClick={handleConfirm}
+      disabled={confirming}
+      className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 mt-4"
+    >
+      <ShieldCheck size={18} />
+      {confirming ? 'Tasdiqlanmoqda...' : 'Farqni tasdiqlash'}
+    </button>
+  )
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -121,7 +141,7 @@ export default function FarqDetail() {
             </div>
           )}
 
-          {/* Comparison table */}
+          {/* Comparison */}
           <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">
             Yuborilgan / Qabul qilingan
           </p>
@@ -129,10 +149,45 @@ export default function FarqDetail() {
           {p?.status === 'yolda' ? (
             <div className="flex items-center gap-3 bg-ccard border border-cborder rounded-2xl p-4">
               <Clock size={18} className="text-primary" />
-              <span className="text-sm text-text-sub">Partiya hali qabul qilinmagan</span>
+              <span className="text-sm text-text-sub">
+                {isTotalMode ? `Yuborilgan: ${p.sentTotal} ta — hali qabul qilinmagan` : 'Partiya hali qabul qilinmagan'}
+              </span>
             </div>
+          ) : isTotalMode ? (
+            <>
+              {/* YANGI rejim: faqat umumiy son bo'yicha */}
+              <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
+                {[
+                  { label: 'Yuborilgan',     value: `${p.sentTotal} ta`, cls: 'text-ctext' },
+                  { label: 'Qabul qilingan', value: `${receivedTotal} ta`, cls: 'text-ctext' },
+                  { label: 'Farq',           value: farqSoni === 0 ? '0' : (farqSoni > 0 ? `+${farqSoni}` : `${farqSoni}`),
+                    cls: farqSoni < 0 ? 'text-cred' : farqSoni > 0 ? 'text-corange' : 'text-ctext' },
+                ].map(({ label, value, cls }, i) => (
+                  <div key={label} className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? 'border-t border-separator' : ''}`}>
+                    <span className="text-sm text-text-sub">{label}</span>
+                    <span className={`text-base font-bold ${cls}`}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className={`flex items-center gap-3 rounded-2xl p-4 ${hasFarq ? 'bg-red-bg' : 'bg-green-bg'}`}>
+                {hasFarq
+                  ? <AlertCircle size={20} className="text-cred shrink-0" />
+                  : <CheckCircle size={20} className="text-cgreen shrink-0" />
+                }
+                <span className={`text-sm font-semibold ${hasFarq ? 'text-[#b91c1c] dark:text-red-300' : 'text-[#1a7a3c] dark:text-green-300'}`}>
+                  {hasFarq
+                    ? `Farq: ${farqSoni > 0 ? '+' : ''}${farqSoni} ta`
+                    : "Soni to'g'ri keldi"
+                  }
+                </span>
+              </div>
+
+              {confirmBtn}
+            </>
           ) : (
             <>
+              {/* ESKI rejim (legacy): per-type jadval */}
               <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
                 <div className="flex bg-cbg border-b border-separator px-4 py-2.5">
                   <span className="flex-1 text-xs font-semibold text-text-sub uppercase tracking-wide">Gul</span>
@@ -154,7 +209,6 @@ export default function FarqDetail() {
                 ))}
               </div>
 
-              {/* Summary */}
               <div className={`flex items-center gap-3 rounded-2xl p-4 ${hasFarq ? 'bg-red-bg' : 'bg-green-bg'}`}>
                 {hasFarq
                   ? <AlertCircle size={20} className="text-cred shrink-0" />
@@ -168,17 +222,7 @@ export default function FarqDetail() {
                 </span>
               </div>
 
-              {/* Подтверждение farq — только если статус farq_bor */}
-              {p?.status === 'farq_bor' && (
-                <button
-                  onClick={handleConfirm}
-                  disabled={confirming}
-                  className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 mt-4"
-                >
-                  <ShieldCheck size={18} />
-                  {confirming ? 'Tasdiqlanmoqda...' : 'Farqni tasdiqlash'}
-                </button>
-              )}
+              {confirmBtn}
             </>
           )}
 
@@ -194,7 +238,21 @@ export default function FarqDetail() {
 
       <BottomModal open={editOpen} onClose={() => setEditOpen(false)} title="Partiyani tahrirlash">
         <div className="pt-4 space-y-4">
-          <FlowerListEditor flowers={editSent} onChange={setEditSent} label="Yuborilgan (Teplitsa)" />
+          {isTotalMode ? (
+            <div className="px-5">
+              <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan soni (Teplitsa)</p>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editSoni}
+                onChange={e => setEditSoni(e.target.value.replace(/\D/g, ''))}
+                className="w-full bg-cbg border border-cborder rounded-xl px-4 py-3 text-ctext text-lg font-bold outline-none"
+                placeholder="0"
+              />
+            </div>
+          ) : (
+            <FlowerListEditor flowers={editSent} onChange={setEditSent} label="Yuborilgan (Teplitsa)" />
+          )}
           {p?.status !== 'yolda' && (
             <FlowerListEditor flowers={editReceived} onChange={setEditReceived} label="Qabul qilingan (Kassa)" />
           )}
