@@ -200,20 +200,25 @@ export default function Sotuv() {
 
       {/* Holat */}
       <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Holat</p>
-      <div className="flex gap-2 mb-5">
-        {[{ key: 'yaxshi', label: 'Yaxshi' }, { key: 'nuqsonli', label: 'Nuqsonli' }].map(h => (
-          <button
-            key={h.key}
-            onClick={() => setItems(prev => prev.map(it => ({ ...it, holat: h.key })))}
-            className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-colors border ${
-              items[0]?.holat === h.key
-                ? h.key === 'yaxshi' ? 'bg-cgreen text-white border-cgreen' : 'bg-corange text-white border-corange'
-                : 'bg-ccard text-text-sub border-cborder'
-            }`}
-          >
-            {h.label}
-          </button>
-        ))}
+      {/* Segment-tanlagich: to'ldirilgan ikkita katta tugma asosiy "Saqlash"
+          tugmasidan kuchliroq ko'rinib, e'tiborni o'g'irlab turardi */}
+      <div className="flex gap-1 p-1 mb-5 bg-cbg border border-cborder rounded-xl">
+        {[{ key: 'yaxshi', label: 'Yaxshi' }, { key: 'nuqsonli', label: 'Nuqsonli' }].map(h => {
+          const active = items[0]?.holat === h.key
+          return (
+            <button
+              key={h.key}
+              onClick={() => setItems(prev => prev.map(it => ({ ...it, holat: h.key })))}
+              className={`flex-1 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                active
+                  ? `bg-ccard shadow-sm ${h.key === 'yaxshi' ? 'text-cgreen' : 'text-corange'}`
+                  : 'text-text-sub hover:text-ctext'
+              }`}
+            >
+              {h.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Total */}
