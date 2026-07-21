@@ -173,7 +173,6 @@ function TolovModal({ qarz, onClose, onPaid }) {
           onChange={setSana}
           label="To'lov sanasi"
           min={todayLocal(new Date(qarz.createdAt))}
-          hint="Bo'sh qoldirsangiz — bugun. Qarz sanasidan oldin bo'la olmaydi"
         />
 
         <button
