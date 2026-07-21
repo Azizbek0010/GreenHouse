@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Plus, Trash2, User, Phone } from 'lucide-react'
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
+import SanaField from '../../components/SanaField'
 import { useStockMap, stockRemaining, StockTypeSelect, StockSizeButtons } from '../../components/StockFlowerPicker'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
@@ -129,6 +130,7 @@ export default function QarzSotuv() {
   const [items, setItems]         = useState([newItem()])
   const [buyerName, setBuyerName]     = useState('')
   const [buyerPhone, setBuyerPhone]   = useState('')
+  const [sana, setSana]     = useState('')   // bo'sh = bugun
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -173,6 +175,7 @@ export default function QarzSotuv() {
         flowers,
         buyerName:  buyerName.trim(),
         buyerPhone: '+998' + buyerPhone,
+        sana:       sana || undefined,
       })
       navigate('/kassa/tarix')
     } catch (e) {
@@ -251,6 +254,9 @@ export default function QarzSotuv() {
           />
         </div>
       </div>
+
+      {/* Sana — ixtiyoriy, eng pastda. To'lov sanasi keyin, Tarixdagi to'lov oynasida kiritiladi */}
+      <SanaField value={sana} onChange={setSana} />
 
       <button
         onClick={onSave}

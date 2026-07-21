@@ -1,9 +1,14 @@
 const Atxod = require('../models/Atxod')
 const { getRemaining } = require('../utils/stock')
+const { resolveSana, sanaFields } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
   try {
-    const { flowerType, razmer, qty, sabab, qiymat } = req.body
+    const { flowerType, razmer, qty, sabab, qiymat, sana } = req.body
+
+    // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
+    const s = resolveSana(sana)
+    if (s.error) return res.status(400).json({ message: s.error })
 
     const qtyN = Number(qty), razmerN = Number(razmer), qiymatN = Number(qiymat)
     if (!flowerType || !Number.isInteger(qtyN) || qtyN <= 0 || !Number.isFinite(razmerN) || razmerN <= 0)
@@ -23,6 +28,7 @@ exports.create = async (req, res, next) => {
       qty: qtyN,
       sabab,
       qiymat: qiymatN,
+      ...sanaFields(s),
     })
 
     const io = req.app.get('io')

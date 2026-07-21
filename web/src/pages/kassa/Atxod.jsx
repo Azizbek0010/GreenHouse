@@ -4,6 +4,7 @@ import { ArrowLeft, Trash2, Info, Check, Plus, ChevronDown } from 'lucide-react'
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
+import SanaField from '../../components/SanaField'
 import { useStockMap, stockRemaining, StockTypeSelect, StockSizeButtons } from '../../components/StockFlowerPicker'
 
 const SABABLAR = [
@@ -152,6 +153,7 @@ export default function KassaAtxod() {
   const navigate = useNavigate()
   const { stock } = useStockMap()
   const [items, setItems]   = useState([newItem()])
+  const [sana, setSana]     = useState('')   // bo'sh = bugun
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -190,6 +192,7 @@ export default function KassaAtxod() {
         qty:        num(it.qty),
         sabab:      it.sabab,
         qiymat:     num(it.qiymat),
+        sana:       sana || undefined,
       })))
       navigate('/kassa')
     } catch (e) {
@@ -249,6 +252,9 @@ export default function KassaAtxod() {
           <p className="text-2xl font-bold text-cred">{money(total)} <span className="text-base font-medium">s</span></p>
         </div>
       )}
+
+      {/* Sana — ixtiyoriy, eng pastda */}
+      <SanaField value={sana} onChange={setSana} />
 
       <button
         onClick={onSave}

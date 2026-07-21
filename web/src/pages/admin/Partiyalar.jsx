@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
-import { Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 
 const FILTERS = [
   { key: 'hammasi',       label: 'Hammasi' },
@@ -125,8 +125,9 @@ export default function AdminPartiyalar() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
                       <p className="text-xs text-text-sub mt-0.5">{summarize(p) || '—'}</p>
-                      <p className="text-xs text-[#9aa0a8] mt-0.5">
-                        {p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'} · {soat(p.createdAt)}
+                      <p className="text-xs text-[#9aa0a8] mt-0.5 flex items-center gap-1.5">
+                        <span>{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'} · {soat(p.createdAt)}</span>
+                        <QoldaBadge show={p.backfill} />
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">

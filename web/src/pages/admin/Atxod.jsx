@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, X, Check } from 'lucide-react'
 import { api } from '../../lib/api'
-import { Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 
 const FILTERS = [
   { key: 'pending',  label: 'Kutilmoqda', color: 'text-corange' },
@@ -148,7 +148,9 @@ export default function AdminAtxod() {
                           Qiymati: {money(a.qiymat * a.qty)} s
                         </p>
                       )}
-                      <p className="text-xs text-[#9aa0a8] mt-1">{soat(a.createdAt)}</p>
+                      <p className="text-xs text-[#9aa0a8] mt-1 flex items-center gap-1.5">
+                        {soat(a.createdAt)} <QoldaBadge show={a.backfill} />
+                      </p>
 
                       {a.status === 'pending' && (
                         <div className="flex gap-3 mt-4">

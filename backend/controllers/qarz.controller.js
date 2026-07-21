@@ -1,5 +1,6 @@
 const Qarz = require('../models/Qarz')
 const { getStockMap, key } = require('../utils/stock')
+const { resolveSana, sanaFields } = require('../utils/sana')
 
 function parseFlowers(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null
@@ -41,6 +42,10 @@ exports.create = async (req, res, next) => {
     if (!name)  return res.status(400).json({ message: 'Sotib oluvchi ismi shart' })
     if (!phone) return res.status(400).json({ message: 'Telefon raqami shart' })
 
+    // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
+    const s = resolveSana(req.body.sana)
+    if (s.error) return res.status(400).json({ message: s.error })
+
     // Ombor limiti: har bir (tur, razmer) bo'yicha jami so'ralgan soni qoldiqdan oshmasin
     const stock = await getStockMap(req.user.id)
     const need  = new Map()
@@ -63,6 +68,7 @@ exports.create = async (req, res, next) => {
       flowers,
       buyer: { name, phone },
       totalPrice,
+      ...sanaFields(s),
     })
 
     const io = req.app.get('io')
@@ -186,7 +192,7 @@ exports.adminDelete = async (req, res, next) => {
   }
 }
 
-// PATCH /api/qarz/:id/tolov { amount } — to'liq yoki bo'lib to'lash
+// PATCH /api/qarz/:id/tolov { amount, sana? } — to'liq yoki bo'lib to'lash
 exports.tolov = async (req, res, next) => {
   try {
     const qarz = await Qarz.findById(req.params.id)
@@ -202,11 +208,21 @@ exports.tolov = async (req, res, next) => {
     if (amount > remaining)
       return res.status(400).json({ message: `To'lov qoldiqdan (${remaining}) oshib ketdi` })
 
-    qarz.payments.push({ amount, at: new Date() })
+    // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt.
+    // Bu yerda sana muhim: daromad payments[].at bo'yicha hisoblanadi (stats.controller.js),
+    // ya'ni fevralda to'langan pul fevral daromadiga tushishi kerak.
+    const s = resolveSana(req.body.sana)
+    if (s.error) return res.status(400).json({ message: s.error })
+    const at = s.createdAt || new Date()
+    if (at < qarz.createdAt)
+      return res.status(400).json({ message: "To'lov sanasi qarz sanasidan oldin bo'lishi mumkin emas" })
+
+    qarz.payments.push({ amount, at })
+    qarz.payments.sort((a, b) => a.at - b.at)
     qarz.paidAmount += amount
     if (qarz.paidAmount >= qarz.totalPrice) {
       qarz.isPaid = true
-      qarz.paidAt = new Date()
+      qarz.paidAt = qarz.payments.at(-1).at   // eng oxirgi to'lov sanasi
     }
     await qarz.save()
 

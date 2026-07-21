@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Plus, Trash2 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
+import SanaField from '../../components/SanaField'
 import { useStockMap, stockRemaining, StockTypeSelect, StockSizeButtons } from '../../components/StockFlowerPicker'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
@@ -115,6 +116,7 @@ export default function Sotuv() {
   const navigate = useNavigate()
   const { stock } = useStockMap()
   const [items, setItems]   = useState([newItem()])
+  const [sana, setSana]     = useState('')   // bo'sh = bugun
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -154,6 +156,7 @@ export default function Sotuv() {
         holat:        it.holat,
         pricePerUnit: num(it.narx),
         discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
+        sana: sana || undefined,
       })))
       navigate('/kassa')
     } catch (e) {
@@ -223,6 +226,9 @@ export default function Sotuv() {
           <p className="text-2xl font-bold text-primary">{money(total)} <span className="text-base font-medium">s</span></p>
         </div>
       )}
+
+      {/* Sana — ixtiyoriy, eng pastda */}
+      <SanaField value={sana} onChange={setSana} />
 
       <button
         onClick={onSave}

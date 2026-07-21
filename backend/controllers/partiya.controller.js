@@ -1,6 +1,7 @@
 const Partiya = require('../models/Partiya')
 const User    = require('../models/User')
 const { sendPush } = require('../utils/pushNotification')
+const { resolveSana, sanaFields } = require('../utils/sana')
 
 // flowers strukturasini tekshirish: [{ type, sizes: [{ sm, qty }] }]
 function validateFlowers(flowers) {
@@ -19,11 +20,15 @@ function validateFlowers(flowers) {
 
 exports.create = async (req, res, next) => {
   try {
-    const { kassaId, soni } = req.body
+    const { kassaId, soni, sana } = req.body
     // Teplitsa endi faqat umumiy sonni yuboradi (tur/razmersiz)
     const soniNum = Number(soni)
     if (!Number.isInteger(soniNum) || soniNum <= 0)
       return res.status(400).json({ message: 'Gullar soni musbat butun son bo\'lishi kerak' })
+
+    // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
+    const s = resolveSana(sana)
+    if (s.error) return res.status(400).json({ message: s.error })
 
     const kassa = await User.findById(kassaId)
     if (!kassa || kassa.role !== 'kassa')
@@ -33,6 +38,7 @@ exports.create = async (req, res, next) => {
       teplitsa:  req.user.id,
       kassa:     kassaId,
       sentTotal: soniNum,
+      ...sanaFields(s),
     })
 
     if (kassa.expoPushToken) {

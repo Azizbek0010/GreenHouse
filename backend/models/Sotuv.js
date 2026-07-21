@@ -9,6 +9,8 @@ const sotuvSchema = new mongoose.Schema({
   pricePerUnit:{ type: Number, required: true },
   discountPrice: { type: Number, default: null },   // chegirma bilan yakuniy narx (ixtiyoriy)
   totalPrice:  { type: Number },
+  backfill:    { type: Boolean, default: false },  // sana qo'lda tanlangan
+  enteredAt:   { type: Date, default: null },      // yozuv aslida qachon kiritilgan
 }, { timestamps: true })
 
 sotuvSchema.pre('save', function () {

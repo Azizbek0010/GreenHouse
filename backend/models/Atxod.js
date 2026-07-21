@@ -9,6 +9,8 @@ const atxodSchema = new mongoose.Schema({
   qiymat:     { type: Number, default: 0 },
   status:     { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   adminNote:  { type: String, default: null },
+  backfill:   { type: Boolean, default: false },  // sana qo'lda tanlangan
+  enteredAt:  { type: Date, default: null },      // yozuv aslida qachon kiritilgan
 }, { timestamps: true })
 
 atxodSchema.index({ kassa: 1, createdAt: -1 })

@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ChevronDown, Flower2, Store, Send } from 'lucide-reac
 import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
+import SanaField from '../../components/SanaField'
 
 const QUICK = [250, 500, 1000, 2000]
 
@@ -53,6 +54,7 @@ export default function PartiyaYuborish() {
   const [kassalar, setKassalar] = useState([])
   const [kassaId, setKassaId]   = useState(null)
   const [soni, setSoni]         = useState('')
+  const [sana, setSana]         = useState('')   // bo'sh = bugun
   const [sending, setSending]   = useState(false)
   const [error, setError]       = useState('')
 
@@ -72,7 +74,7 @@ export default function PartiyaYuborish() {
 
     setError(''); setSending(true)
     try {
-      await api.post('/api/partiya', { kassaId, soni: soniNum })
+      await api.post('/api/partiya', { kassaId, soni: soniNum, sana: sana || undefined })
       navigate('/teplitsa')
     } catch (e) {
       setError(e.message)
@@ -165,6 +167,9 @@ export default function PartiyaYuborish() {
       )}
 
       <div className="flex-1" />
+
+      {/* Sana — ixtiyoriy, eng pastda */}
+      <SanaField value={sana} onChange={setSana} />
 
       {/* Amallar */}
       <button

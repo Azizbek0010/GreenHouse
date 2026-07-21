@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandCoins, Phone, Search, Pencil } from 'lucide-react'
 import { api } from '../../lib/api'
-import { Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import QarzEditModal from '../../components/QarzEditModal'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -153,7 +153,9 @@ function SotuvlarTab({ list }) {
                             )}
                           </div>
                           <p className="text-sm text-text-sub">{sv.qty} ta × {money(sv.pricePerUnit)} so'm · {sv.kassa?.name || 'Kassa'}</p>
-                          <p className="text-xs text-text-sub/60 mt-1">{soat(sv.createdAt)}</p>
+                          <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
+                            {soat(sv.createdAt)} <QoldaBadge show={sv.backfill} />
+                          </p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className={`text-lg font-bold ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
@@ -222,7 +224,9 @@ function AtxodlarTab({ list }) {
                       {a.qiymat > 0 && (
                         <p className="text-sm text-cred mt-0.5">Yo'qotish: {money(a.qiymat * a.qty)} so'm</p>
                       )}
-                      <p className="text-xs text-text-sub/60 mt-1">{soat(a.createdAt)}</p>
+                      <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
+                        {soat(a.createdAt)} <QoldaBadge show={a.backfill} />
+                      </p>
                       {a.adminNote && (
                         <div className="mt-2 px-3 py-2 bg-cbg rounded-xl">
                           <p className="text-xs text-text-sub">Admin izohi: <span className="text-ctext font-medium">{a.adminNote}</span></p>
@@ -285,8 +289,9 @@ function QarzlarTab({ list, sum, onChanged }) {
             <Phone size={12} /> {q.buyer?.phone}
           </a>
           <p className="text-sm text-text-sub mt-1">{qarzFlowers(q.flowers)}</p>
-          <p className="text-xs text-text-sub/60 mt-1">
-            {q.kassa?.name || 'Kassa'} · {soat(q.createdAt)}{!q.isPaid ? ` · ${kunOldin(q.createdAt)}` : ''}
+          <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
+            <span>{q.kassa?.name || 'Kassa'} · {soat(q.createdAt)}{!q.isPaid ? ` · ${kunOldin(q.createdAt)}` : ''}</span>
+            <QoldaBadge show={q.backfill} />
           </p>
 
           {!q.isPaid && q.paidAmount > 0 && (
@@ -391,7 +396,9 @@ function PartiyaCard({ p }) {
         </div>
         <p className="text-sm text-text-sub">{p.teplitsa?.name || 'Teplitsa'} → {p.kassa?.name || 'Kassa'}</p>
         <p className="text-xs text-text-sub mt-0.5">{summarize(p)}</p>
-        <p className="text-xs text-text-sub/60 mt-1">{soat(p.createdAt)}</p>
+        <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
+          {soat(p.createdAt)} <QoldaBadge show={p.backfill} />
+        </p>
 
         {/* Развернуть детали */}
         <button onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}

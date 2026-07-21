@@ -19,6 +19,17 @@ export function Badge({ status }) {
   )
 }
 
+// Sanasi qo'lda tanlangan yozuv — admin ko'rib turishi uchun.
+// createdAt endi "kiritilgan payt" degani emas, shuning uchun belgilab qo'yiladi.
+export function QoldaBadge({ show }) {
+  if (!show) return null
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cbg text-cgray border border-cborder">
+      qo'lda
+    </span>
+  )
+}
+
 export function PrimaryButton({ title, onClick, loading, disabled, icon, className = '' }) {
   return (
     <button

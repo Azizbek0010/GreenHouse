@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
-import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 
 const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 
@@ -95,7 +95,9 @@ export default function AdminSotuvlar() {
                       <p className="text-xs text-text-sub mt-0.5">
                         {sv.qty} ta × {money(sv.pricePerUnit)} · {sv.kassa?.name || 'Kassa'}
                       </p>
-                      <p className="text-xs text-[#9aa0a8] mt-0.5">{soat(sv.createdAt)}</p>
+                      <p className="text-xs text-[#9aa0a8] mt-0.5 flex items-center gap-1.5">
+                        {soat(sv.createdAt)} <QoldaBadge show={sv.backfill} />
+                      </p>
                     </div>
                     <p className={`text-sm font-bold shrink-0 ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
                       {money(sv.totalPrice)} s

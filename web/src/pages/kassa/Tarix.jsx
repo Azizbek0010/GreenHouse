@@ -3,8 +3,10 @@ import { ShoppingCart, Trash2, Lock, HandCoins, User, Phone, Check, Search } fro
 import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
+import SanaField from '../../components/SanaField'
+import { todayLocal } from '../../lib/date'
 
-const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+const UZ_MONTHS =['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function num(s)   { return parseInt(String(s).replace(/\s/g, '')) || 0 }
@@ -105,6 +107,7 @@ const STATUS_MAP  = {
 // ── To'lov (payment) modal ─────────────────────────────────────────
 function TolovModal({ qarz, onClose, onPaid }) {
   const [amount, setAmount] = useState('')
+  const [sana, setSana]     = useState('')   // bo'sh = bugun
   const [paying, setPaying] = useState(false)
   const [error, setError]   = useState('')
   if (!qarz) return null
@@ -117,7 +120,7 @@ function TolovModal({ qarz, onClose, onPaid }) {
     if (val > remaining)     return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
     setError(''); setPaying(true)
     try {
-      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val })
+      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val, sana: sana || undefined })
       onPaid()
     } catch (e) {
       setError(e.message)
@@ -163,6 +166,15 @@ function TolovModal({ qarz, onClose, onPaid }) {
         >
           To'liq to'lash ({money(remaining)} so'm)
         </button>
+
+        {/* To'lov sanasi — ixtiyoriy. Daromad shu sana bo'yicha hisoblanadi */}
+        <SanaField
+          value={sana}
+          onChange={setSana}
+          label="To'lov sanasi"
+          min={todayLocal(new Date(qarz.createdAt))}
+          hint="Bo'sh qoldirsangiz — bugun. Qarz sanasidan oldin bo'la olmaydi"
+        />
 
         <button
           onClick={pay}

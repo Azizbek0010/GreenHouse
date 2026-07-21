@@ -27,6 +27,8 @@ const qarzSchema = new mongoose.Schema({
   payments:    { type: [paymentSchema], default: [] },
   isPaid:      { type: Boolean, default: false },
   paidAt:      { type: Date, default: null },       // to'liq yopilgan sana
+  backfill:    { type: Boolean, default: false },   // sana qo'lda tanlangan
+  enteredAt:   { type: Date, default: null },       // yozuv aslida qachon kiritilgan
 }, { timestamps: true })
 
 qarzSchema.index({ kassa: 1, createdAt: -1 })
