@@ -1,3 +1,7 @@
+/* Manrope — o'zimizda hostlanadi (tashqi so'rov yo'q, offlayn ham ishlaydi).
+   Variable font: bitta fayl, barcha qalinliklar. */
+@import '@fontsource-variable/manrope';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -46,10 +50,32 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Manrope Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--c-bg);
   color: var(--c-text);
   transition: background-color 0.2s, color 0.2s;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Pul va sonlar ustunlarda sakramasligi uchun bir xil kenglikdagi raqamlar.
+   Kassa dasturida summalar doim yonma-yon turadi. */
+.tabular, input[inputmode='numeric'], input[type='date'] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sarlavhalar yakka so'z bilan tugab qolmasin */
+h1, h2, h3 { text-wrap: balance; }
+
+/* Brauzer o'zi qo'yadigan kalendar ikonkasini yashiramiz —
+   sana maydonida o'zimizning ikonka bor, ikkitasi ortiqcha. */
+input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
 }
 
 /* Scrollbar styling */
