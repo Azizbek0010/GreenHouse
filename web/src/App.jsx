@@ -27,7 +27,6 @@ import KassaSotuv      from './pages/kassa/Sotuv'
 import KassaQarzSotuv  from './pages/kassa/QarzSotuv'
 import KassaAtxod      from './pages/kassa/Atxod'
 import KassaTarix      from './pages/kassa/Tarix'
-import QolganGullar    from './pages/QolganGullar'
 
 import Profil          from './pages/Profil'
 
@@ -66,7 +65,6 @@ export default function App() {
             <Route path="/admin/partiyalar" element={<PrivateRoute role="admin"><AdminPartiyalar /></PrivateRoute>} />
             <Route path="/admin/sotuvlar"   element={<PrivateRoute role="admin"><AdminSotuvlar /></PrivateRoute>} />
             <Route path="/admin/statistika" element={<PrivateRoute role="admin"><AdminStatistika /></PrivateRoute>} />
-            <Route path="/admin/qolgan"     element={<PrivateRoute role="admin"><QolganGullar /></PrivateRoute>} />
             <Route path="/admin/atxod"      element={<PrivateRoute role="admin"><AdminAtxod /></PrivateRoute>} />
             <Route path="/admin/farq/:id"        element={<PrivateRoute role="admin"><AdminFarq /></PrivateRoute>} />
             <Route path="/admin/sotuv/:id"       element={<PrivateRoute role="admin"><AdminSotuvDetail /></PrivateRoute>} />
@@ -87,7 +85,6 @@ export default function App() {
             <Route path="/kassa/qarz"   element={<PrivateRoute role="kassa"><KassaQarzSotuv /></PrivateRoute>} />
             <Route path="/kassa/atxod"  element={<PrivateRoute role="kassa"><KassaAtxod /></PrivateRoute>} />
             <Route path="/kassa/tarix"  element={<PrivateRoute role="kassa"><KassaTarix /></PrivateRoute>} />
-            <Route path="/kassa/qolgan" element={<PrivateRoute role="kassa"><QolganGullar /></PrivateRoute>} />
 
             {/* Profil (barcha rollar) */}
             <Route path="/profil" element={<PrivateRoute><Profil /></PrivateRoute>} />

@@ -17,7 +17,8 @@ const partiyaSchema = new mongoose.Schema({
   status:    { type: String, enum: ['yolda', 'qabul_qilindi', 'farq_bor'], default: 'yolda' },
   sentTotal: { type: Number, default: null }, // YANGI rejim: teplitsa yuborgan umumiy soni (tur/razmersiz)
   sent:      [flowerSchema],                  // ESKI rejim: tur+razmer bo'yicha (legacy partiyalar uchun)
-  received:  [flowerSchema],
+  receivedTotal: { type: Number, default: null }, // YANGI rejim: kassa sanagan umumiy soni (tur/razmersiz)
+  received:  [flowerSchema],                  // ESKI rejim: kassa tur+razmer bilan kiritgani (legacy)
   farq:      { type: Array, default: [] },    // ESKI rejim: per-type farq (legacy)
   farqSoni:  { type: Number, default: null }, // YANGI rejim: raqamli farq (qabul jami − sentTotal)
   backfill:  { type: Boolean, default: false }, // sana qo'lda tanlangan

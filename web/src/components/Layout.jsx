@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart, BarChart2,
   Trash2, Users, Settings, Sun, Moon, LogOut,
-  Home, Menu, X, ChevronRight, History, Clock, Flower2,
+  Home, Menu, X, ChevronRight, History, Clock,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
@@ -12,7 +12,6 @@ const NAV = {
   admin: [
     { to: '/admin',            label: 'Bosh sahifa', icon: LayoutDashboard },
     { to: '/admin/statistika', label: 'Statistika',  icon: BarChart2 },
-    { to: '/admin/qolgan',     label: 'Qolgan gullar', icon: Flower2 },
     { to: '/admin/tarix',      label: 'Tarix',       icon: Clock },
 
     { to: '/admin/users',      label: 'Foydalanuvchilar', icon: Users },
@@ -28,7 +27,6 @@ const NAV = {
     { to: '/kassa/qabul',  label: 'Qabul',       icon: Package },
     { to: '/kassa/sotuv',  label: 'Sotuv',       icon: ShoppingCart },
     { to: '/kassa/atxod',  label: 'Atxod',       icon: Trash2 },
-    { to: '/kassa/qolgan', label: 'Qolgan gullar', icon: Flower2 },
     { to: '/kassa/tarix',  label: 'Tarix',       icon: History },
   ],
 }

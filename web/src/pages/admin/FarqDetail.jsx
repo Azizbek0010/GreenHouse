@@ -5,12 +5,14 @@ import { api } from '../../lib/api'
 import { Badge, Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../components/ui'
 import { DeleteButton } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
-import FlowerListEditor from '../../components/FlowerListEditor'
 
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 function totalOf(flowers = []) {
   return flowers.reduce((s, f) => s + f.sizes.reduce((a, x) => a + x.qty, 0), 0)
 }
+// Yangi rejimda son maydonda, eski (legacy) partiyalarda — tur+razmer massividan
+function sentTotalOf(p) { return p?.sentTotal     != null ? p.sentTotal     : totalOf(p?.sent) }
+function recvTotalOf(p) { return p?.receivedTotal != null ? p.receivedTotal : totalOf(p?.received) }
 function buildRows(sent = [], received = []) {
   const map = new Map()
   const key = (t, s) => `${t}|${s}`
@@ -35,27 +37,25 @@ export default function FarqDetail() {
   const [confirming, setConfirming] = useState(false)
 
   // Admin edit/delete
-  const [editOpen, setEditOpen]       = useState(false)
-  const [editSoni, setEditSoni]       = useState('')
-  const [editSent, setEditSent]       = useState([])
-  const [editReceived, setEditReceived] = useState([])
-  const [saving, setSaving]           = useState(false)
-  const [deleting, setDeleting]       = useState(false)
+  const [editOpen, setEditOpen]   = useState(false)
+  const [editSoni, setEditSoni]   = useState('')
+  const [editQabul, setEditQabul] = useState('')
+  const [saving, setSaving]       = useState(false)
+  const [deleting, setDeleting]   = useState(false)
 
-  const isTotalMode = !!(p && p.sentTotal != null)
+  const isTotalMode = !!(p && (p.sentTotal != null || p.receivedTotal != null))
 
   function openEdit() {
-    setEditSoni(p.sentTotal != null ? String(p.sentTotal) : '')
-    setEditSent(JSON.parse(JSON.stringify(p.sent || [])))
-    setEditReceived(JSON.parse(JSON.stringify(p.received || [])))
+    setEditSoni(String(sentTotalOf(p) || ''))
+    setEditQabul(String(recvTotalOf(p) || ''))
     setEditOpen(true)
   }
 
   async function handleSave() {
     setSaving(true); setError('')
     try {
-      const body = isTotalMode ? { soni: parseInt(editSoni) || 0 } : { sent: editSent }
-      if (p.status !== 'yolda') body.received = editReceived
+      const body = { soni: parseInt(editSoni) || 0 }
+      if (p.status !== 'yolda') body.qabulSoni = parseInt(editQabul) || 0
       const updated = await api.patch(`/api/partiya/${id}`, body)
       setP(updated)
       setEditOpen(false)
@@ -91,8 +91,9 @@ export default function FarqDetail() {
   }, [id])
 
   const rows          = (p && !isTotalMode) ? buildRows(p.sent, p.received) : []
-  const receivedTotal = totalOf(p?.received)
-  const farqSoni      = p?.farqSoni != null ? p.farqSoni : (receivedTotal - (p?.sentTotal || 0))
+  const sentTotal     = sentTotalOf(p)
+  const receivedTotal = recvTotalOf(p)
+  const farqSoni      = p?.farqSoni != null ? p.farqSoni : (receivedTotal - sentTotal)
   const hasFarq       = isTotalMode ? farqSoni !== 0 : rows.some(r => r.diff !== 0)
 
   const confirmBtn = p?.status === 'farq_bor' && (
@@ -150,7 +151,7 @@ export default function FarqDetail() {
             <div className="flex items-center gap-3 bg-ccard border border-cborder rounded-2xl p-4">
               <Clock size={18} className="text-primary" />
               <span className="text-sm text-text-sub">
-                {isTotalMode ? `Yuborilgan: ${p.sentTotal} ta — hali qabul qilinmagan` : 'Partiya hali qabul qilinmagan'}
+                {isTotalMode ? `Yuborilgan: ${sentTotal} ta — hali qabul qilinmagan` : 'Partiya hali qabul qilinmagan'}
               </span>
             </div>
           ) : isTotalMode ? (
@@ -158,7 +159,7 @@ export default function FarqDetail() {
               {/* YANGI rejim: faqat umumiy son bo'yicha */}
               <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
                 {[
-                  { label: 'Yuborilgan',     value: `${p.sentTotal} ta`, cls: 'text-ctext' },
+                  { label: 'Yuborilgan',     value: `${sentTotal} ta`, cls: 'text-ctext' },
                   { label: 'Qabul qilingan', value: `${receivedTotal} ta`, cls: 'text-ctext' },
                   { label: 'Farq',           value: farqSoni === 0 ? '0' : (farqSoni > 0 ? `+${farqSoni}` : `${farqSoni}`),
                     cls: farqSoni < 0 ? 'text-cred' : farqSoni > 0 ? 'text-corange' : 'text-ctext' },
@@ -238,23 +239,29 @@ export default function FarqDetail() {
 
       <BottomModal open={editOpen} onClose={() => setEditOpen(false)} title="Partiyani tahrirlash">
         <div className="pt-4 space-y-4">
-          {isTotalMode ? (
+          <div className="px-5">
+            <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan soni (Teplitsa)</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={editSoni}
+              onChange={e => setEditSoni(e.target.value.replace(/\D/g, ''))}
+              className="w-full bg-cbg border border-cborder rounded-xl px-4 py-3 text-ctext text-lg font-bold outline-none"
+              placeholder="0"
+            />
+          </div>
+          {p?.status !== 'yolda' && (
             <div className="px-5">
-              <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Yuborilgan soni (Teplitsa)</p>
+              <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">Qabul qilingan soni (Kassa)</p>
               <input
                 type="text"
                 inputMode="numeric"
-                value={editSoni}
-                onChange={e => setEditSoni(e.target.value.replace(/\D/g, ''))}
+                value={editQabul}
+                onChange={e => setEditQabul(e.target.value.replace(/\D/g, ''))}
                 className="w-full bg-cbg border border-cborder rounded-xl px-4 py-3 text-ctext text-lg font-bold outline-none"
                 placeholder="0"
               />
             </div>
-          ) : (
-            <FlowerListEditor flowers={editSent} onChange={setEditSent} label="Yuborilgan (Teplitsa)" />
-          )}
-          {p?.status !== 'yolda' && (
-            <FlowerListEditor flowers={editReceived} onChange={setEditReceived} label="Qabul qilingan (Kassa)" />
           )}
           <p className="text-xs text-text-sub px-5">
             Saqlashda farq va status avtomatik qayta hisoblanadi.

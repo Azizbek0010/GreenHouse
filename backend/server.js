@@ -24,7 +24,6 @@ const qarzRoutes    = require('./routes/qarz.routes')
 const atxodRoutes   = require('./routes/atxod.routes')
 const statsRoutes   = require('./routes/stats.routes')
 const flowerTypeRoutes = require('./routes/flowerType.routes')
-const stockRoutes   = require('./routes/stock.routes')
 
 const DEFAULT_ORIGINS = ['http://localhost:3000', 'http://localhost:8081', 'exp://localhost:8081']
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
@@ -73,7 +72,6 @@ app.use('/api/qarz',    qarzRoutes)
 app.use('/api/atxod',   atxodRoutes)
 app.use('/api/stats',   statsRoutes)
 app.use('/api/flower-types', flowerTypeRoutes)
-app.use('/api/stock',   stockRoutes)
 
 app.use((req, res) => res.status(404).json({ message: 'Route topilmadi' }))
 

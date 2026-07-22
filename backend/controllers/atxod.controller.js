@@ -1,5 +1,4 @@
 const Atxod = require('../models/Atxod')
-const { getRemaining } = require('../utils/stock')
 const { resolveSana, sanaFields } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
@@ -15,11 +14,6 @@ exports.create = async (req, res, next) => {
       return res.status(400).json({ message: "Gul turi, razmer va soni to'g'ri kiritilishi shart" })
     if (!qiymatN || qiymatN <= 0)
       return res.status(400).json({ message: "Qiymatni kiriting (so'm)" })
-
-    // Ombor limiti: mavjud qoldiqdan ortiq atxod yozib bo'lmaydi
-    const remaining = await getRemaining(req.user.id, flowerType, razmerN)
-    if (qtyN > remaining)
-      return res.status(400).json({ message: `Omborda ${flowerType} ${razmerN}sm dan faqat ${Math.max(remaining, 0)} ta qolgan` })
 
     const atxod = await Atxod.create({
       kassa: req.user.id,

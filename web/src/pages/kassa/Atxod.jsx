@@ -5,7 +5,8 @@ import { api } from '../../lib/api'
 import { ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
 import SanaField from '../../components/SanaField'
-import { useStockMap, stockRemaining, StockTypeSelect, StockSizeButtons } from '../../components/StockFlowerPicker'
+import FlowerTypeSelect from '../../components/FlowerTypeSelect'
+import RazmerButtons from '../../components/RazmerButtons'
 
 const SABABLAR = [
   { key: "so'lgan",  label: "So'lgan",  emoji: '🥀' },
@@ -61,18 +62,16 @@ function SelectModal({ options, value, onChange, placeholder = 'Tanlang...' }) {
 }
 
 // ── One flower line item ──────────────────────────────────────────
-function FlowerRow({ item, onChange, onRemove, canRemove, stock }) {
+function FlowerRow({ item, onChange, onRemove, canRemove }) {
   const update = (field, val) => onChange({ ...item, [field]: val })
-  const remaining = item.type && item.razmer ? stockRemaining(stock, item.type, item.razmer) : null
 
   return (
     <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
       <div className="flex items-center border-b border-separator">
         <div className="flex-1">
-          <StockTypeSelect
-            stock={stock}
+          <FlowerTypeSelect
             value={item.type}
-            onChange={v => onChange({ ...item, type: v, razmer: null })}
+            onChange={v => update('type', v)}
           />
         </div>
         {canRemove && (
@@ -87,23 +86,11 @@ function FlowerRow({ item, onChange, onRemove, canRemove, stock }) {
 
       <div className="px-4 py-3 border-b border-separator">
         <p className="text-xs text-text-sub mb-2 font-medium">Razmer</p>
-        <StockSizeButtons
-          stock={stock}
-          type={item.type}
-          value={item.razmer}
-          onChange={z => update('razmer', z)}
-        />
+        <RazmerButtons value={item.razmer} onChange={z => update('razmer', z)} />
       </div>
 
       <div className="flex items-center px-4 py-3 border-b border-separator">
-        <span className="flex-1 text-sm text-ctext">
-          Soni
-          {remaining != null && (
-            <span className={`ml-2 text-xs ${num(item.qty) > remaining ? 'text-cred font-semibold' : 'text-text-sub'}`}>
-              (omborda {remaining} ta)
-            </span>
-          )}
-        </span>
+        <span className="flex-1 text-sm text-ctext">Soni</span>
         <input
           type="text"
           inputMode="numeric"
@@ -151,7 +138,6 @@ const newItem = () => ({ id: Date.now() + Math.random(), type: '', razmer: null,
 
 export default function KassaAtxod() {
   const navigate = useNavigate()
-  const { stock } = useStockMap()
   const [items, setItems]   = useState([newItem()])
   const [sana, setSana]     = useState('')   // bo'sh = bugun
   const [saving, setSaving] = useState(false)
@@ -172,18 +158,6 @@ export default function KassaAtxod() {
       if (!(num(it.qiymat) > 0))  return setError("Qiymatni kiriting (so'm)")
       if (!it.sabab)              return setError('Sababni tanlang')
     }
-    // Ombor limiti: bir xil (tur, razmer) qatorlar jami qoldiqdan oshmasin
-    const need = new Map()
-    for (const it of items) {
-      const k = `${it.type}|${it.razmer}`
-      need.set(k, (need.get(k) || 0) + num(it.qty))
-    }
-    for (const [k, qty] of need) {
-      const [t, sm] = k.split('|')
-      const have = stockRemaining(stock, t, Number(sm))
-      if (qty > have) return setError(`Omborda ${t} ${sm}sm dan faqat ${have} ta qolgan`)
-    }
-
     setError(''); setSaving(true)
     try {
       await Promise.all(items.map(it => api.post('/api/atxod', {
@@ -227,7 +201,6 @@ export default function KassaAtxod() {
         <FlowerRow
           key={item.id}
           item={item}
-          stock={stock}
           onChange={updated => updateItem(item.id, updated)}
           onRemove={() => removeItem(item.id)}
           canRemove={items.length > 1}

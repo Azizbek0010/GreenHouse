@@ -1,5 +1,4 @@
 const Qarz = require('../models/Qarz')
-const { getStockMap, key } = require('../utils/stock')
 const { resolveSana, sanaFields } = require('../utils/sana')
 
 function parseFlowers(arr) {
@@ -45,21 +44,6 @@ exports.create = async (req, res, next) => {
     // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
     const s = resolveSana(req.body.sana)
     if (s.error) return res.status(400).json({ message: s.error })
-
-    // Ombor limiti: har bir (tur, razmer) bo'yicha jami so'ralgan soni qoldiqdan oshmasin
-    const stock = await getStockMap(req.user.id)
-    const need  = new Map()
-    for (const f of flowers) {
-      const k = key(f.type, f.razmer)
-      need.set(k, (need.get(k) || 0) + f.qty)
-    }
-    for (const [k, qty] of need) {
-      const have = stock.get(k) ? stock.get(k).remaining : 0
-      if (qty > have) {
-        const [t, sm] = k.split('|')
-        return res.status(400).json({ message: `Omborda ${t} ${sm}sm dan faqat ${Math.max(have, 0)} ta qolgan` })
-      }
-    }
 
     const totalPrice = flowers.reduce((s, f) => s + flowerTotal(f), 0)
 

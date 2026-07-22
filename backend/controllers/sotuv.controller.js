@@ -1,5 +1,4 @@
 const Sotuv = require('../models/Sotuv')
-const { getRemaining } = require('../utils/stock')
 const { resolveSana, sanaFields } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
@@ -22,11 +21,6 @@ exports.create = async (req, res, next) => {
       if (discountN > priceN * qtyN)
         return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
     }
-
-    // Ombor limiti: qabul qilingan gullardan ortiq sotib bo'lmaydi
-    const remaining = await getRemaining(req.user.id, flowerType, razmerN)
-    if (qtyN > remaining)
-      return res.status(400).json({ message: `Omborda ${flowerType} ${razmerN}sm dan faqat ${Math.max(remaining, 0)} ta qolgan` })
 
     const sotuv = await Sotuv.create({
       kassa: req.user.id,
