@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CalendarDays, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { CalendarDays, X, Check, ChevronDown } from 'lucide-react'
 import { todayLocal, formatSanaUz, MIN_SANA } from '../lib/date'
 
 // Sana bo'yicha qidiruv — bitta filtrda ikkalasi ham:
@@ -32,10 +32,25 @@ export function useSanaFilter() {
     const r = p.range()
     setPreset(key); setFrom(r.from); setTo(r.to)
   }
-  // Qo'lda kiritilsa — hech qaysi tez tugma yonmaydi
-  const qoldaFrom = v => { setFrom(v); setPreset('aniq') }
-  const qoldaTo   = v => { setTo(v);   setPreset('aniq') }
-  const birKun    = () => { if (from) { setTo(from); setPreset('aniq') } }
+  // Qo'lda kiritilsa — hech qaysi tez tugma yonmaydi.
+  //
+  // Maydonlar bir-birini bloklamaydi: avval Gacha ni tanlab, keyin undan
+  // keyingi Dan ni qo'ysa — Gacha o'zi suriladi (aksincha ham).
+  // Ilgari Gacha ning min i Dan ga bog'langan edi va noto'g'ri tartibda
+  // tanlagan foydalanuvchi kalendarda o'chirilgan sanalarga tiralib qolardi.
+  // Teskari tartibda tanlansa — sanalar o'rin almashadi, ya'ni ikkala
+  // tanlov ham saqlanadi (birini o'chirib yuborish o'rniga).
+  const qoldaFrom = v => {
+    setPreset('aniq')
+    if (v && to && v > to) { setFrom(to); setTo(v) }
+    else setFrom(v)
+  }
+  const qoldaTo = v => {
+    setPreset('aniq')
+    if (v && from && v < from) { setTo(from); setFrom(v) }
+    else setTo(v)
+  }
+  const birKun = () => { if (from) { setTo(from); setPreset('aniq') } }
 
   const active = !!(from || to)
 
@@ -63,10 +78,31 @@ export function useSanaFilter() {
 export default function SanaFilter({ f, count, className = '' }) {
   const [open, setOpen] = useState(false)
   const aniq = f.preset === 'aniq'
+  const wrapRef = useRef(null)
+
+  // Paneldan chiqishning uchta yo'li: tashqariga bosish, Escape va "Tayyor".
+  // Avval faqat "Aniq sana" ni qayta bosish qolgandi — tugma esa tanlangan
+  // filtr tufayli allaqachon yonib turardi, ya'ni uni yana bosish kerakligi
+  // ko'rinmasdi va foydalanuvchi panelda qamalib qolardi.
+  useEffect(() => {
+    if (!open) return
+    const tashqariga = e => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    const tugma = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', tashqariga)
+    document.addEventListener('keydown', tugma)
+    return () => {
+      document.removeEventListener('mousedown', tashqariga)
+      document.removeEventListener('keydown', tugma)
+    }
+  }, [open])
 
   return (
-    <div className={className}>
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+    <div className={className} ref={wrapRef}>
+      {/* flex-wrap, overflow-x-auto emas: tor ekranda "Aniq sana" oxirgi tugma
+          bo'lgani uchun chetdan chiqib ketardi va uni topib bo'lmasdi */}
+      <div className="flex items-center gap-1.5 flex-wrap">
         {PRESETS.map(p => (
           <button
             key={p.key}
@@ -89,11 +125,25 @@ export default function SanaFilter({ f, count, className = '' }) {
           }`}
         >
           <CalendarDays size={13} /> Aniq sana
+          <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       </div>
 
       {open && (
         <div className="mt-2 bg-ccard border border-cborder rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-[11px] font-semibold text-text-sub uppercase tracking-wider">
+              Sana oralig'i
+            </span>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Yopish"
+              className="w-7 h-7 -mr-1 -mt-1 rounded-lg flex items-center justify-center text-text-sub hover:text-ctext hover:bg-cbg transition-colors"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
           <div className="flex gap-2">
             <label className="flex-1 min-w-0">
               <span className="block text-[11px] font-semibold text-text-sub uppercase tracking-wider mb-1">Dan</span>
@@ -101,7 +151,7 @@ export default function SanaFilter({ f, count, className = '' }) {
                 type="date"
                 value={f.from}
                 min={MIN_SANA}
-                max={f.to || todayLocal()}
+                max={todayLocal()}
                 onChange={e => f.qoldaFrom(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-xl border border-cborder bg-cbg text-sm text-ctext outline-none focus:border-primary"
               />
@@ -111,7 +161,7 @@ export default function SanaFilter({ f, count, className = '' }) {
               <input
                 type="date"
                 value={f.to}
-                min={f.from || MIN_SANA}
+                min={MIN_SANA}
                 max={todayLocal()}
                 onChange={e => f.qoldaTo(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-xl border border-cborder bg-cbg text-sm text-ctext outline-none focus:border-primary"
@@ -128,14 +178,24 @@ export default function SanaFilter({ f, count, className = '' }) {
               Faqat shu kun
             </button>
             {f.active && (
+              // Tozalash panelni yopmaydi — foydalanuvchi ko'pincha
+              // boshqa sanani tanlash uchun tozalaydi
               <button
-                onClick={() => { f.tozala(); setOpen(false) }}
+                onClick={f.tozala}
                 className="h-9 px-3 rounded-xl border border-cborder bg-cbg text-xs font-semibold text-cred hover:border-cred transition-colors flex items-center gap-1.5"
               >
                 <X size={13} /> Tozalash
               </button>
             )}
           </div>
+
+          {/* Aniq chiqish yo'li: tanlangan sana saqlanadi, panel yopiladi */}
+          <button
+            onClick={() => setOpen(false)}
+            className="w-full h-10 mt-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+          >
+            <Check size={15} /> Tayyor
+          </button>
         </div>
       )}
 
