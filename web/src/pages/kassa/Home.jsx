@@ -4,6 +4,9 @@ import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight, HandCoins } f
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
 import { StatCard, Badge, PrimaryButton, Spinner, ErrorMsg } from '../../components/ui'
+import { sanaLabel, soat } from '../../lib/date'
+import SavdoCard from '../../components/SavdoCard'
+import { TolovBadge } from '../../components/TolovField'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
@@ -51,7 +54,14 @@ export default function KassaHome() {
 
       {loading ? <Spinner /> : (
         <>
-          {/* Stats */}
+          {/* Bugungi savdo — naqt / karta / qarz taqsimoti bilan */}
+          <SavdoCard
+            savdo={stats.savdo}
+            tushum={stats.tushum}
+            title="Bugungi savdo"
+            subtitle={`${stats.savdo?.gullar || 0} ta gul sotilgan`}
+          />
+
           <div className="flex gap-3 mb-6">
             <StatCard
               label="Bugungi tushum"
@@ -143,9 +153,15 @@ export default function KassaHome() {
               {sotuvlar.map((sv, i) => (
                 <div key={sv._id} className={`flex items-center gap-3 p-4 ${i > 0 ? 'border-t border-separator' : ''}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-ctext">{sv.flowerType} {sv.razmer}sm</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-ctext">{sv.flowerType} {sv.razmer}sm</p>
+                      <TolovBadge value={sv.tolov} />
+                    </div>
                     <p className="text-xs text-text-sub mt-0.5">
                       {sv.qty} ta {sv.holat === 'nuqsonli' ? '· Nuqsonli' : ''}
+                    </p>
+                    <p className="text-xs text-text-sub/60 mt-0.5">
+                      {sanaLabel(sv.createdAt)}, {soat(sv.createdAt)}
                     </p>
                   </div>
                   <p className={`text-sm font-semibold shrink-0 ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>

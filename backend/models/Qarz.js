@@ -10,9 +10,12 @@ const flowerSchema = new mongoose.Schema({
 }, { _id: false })
 
 // Qarzni bo'lib-bo'lib to'lash tarixi (variant A: har bir to'lov o'sha kuni daromadga tushadi)
+// usul — pul qanday kelgani. Qarzga sotishning o'zida to'lov usuli yo'q:
+// o'shanda pul kelmaydi, qarzning ma'nosi shu. Usul faqat to'lov paytida ma'lum.
 const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   at:     { type: Date, default: Date.now },
+  usul:   { type: String, enum: ['naqt', 'karta', null], default: null },
 }, { _id: false })
 
 const qarzSchema = new mongoose.Schema({

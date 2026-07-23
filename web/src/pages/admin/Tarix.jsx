@@ -4,18 +4,15 @@ import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandC
 import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import QarzEditModal from '../../components/QarzEditModal'
+import { sanaLabel, soat, dateKey } from '../../lib/date'
 
 // ── Helpers ──────────────────────────────────────────────────────────
-const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
-
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
-function soat(d) { return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) }
-function kunOldin(d) {
+// Qarz qancha vaqtdan beri kutayotgani — aniq sana bilan birga ko'rsatiladi.
+function kunKutdi(d) {
   const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
-  if (days <= 0) return 'Bugun'
-  if (days === 1) return 'Kecha'
-  return `${days} kun oldin`
+  return days <= 0 ? '' : `${days} kun kutilmoqda`
 }
 // Qarzlarni ism/telefon bo'yicha qidirish + saralash
 function filterSortQarz(list, search, sort) {
@@ -62,20 +59,12 @@ function QarzSearchSort({ search, onSearch, sort, onSort }) {
     </div>
   )
 }
-function dateKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}` }
-function dateLabel(d) {
-  const dt = new Date(d), today = new Date(), yesterday = new Date()
-  yesterday.setDate(today.getDate() - 1)
-  if (dateKey(dt) === dateKey(today))     return 'Bugun'
-  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
-  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
-}
 function groupByDate(items, totalKey) {
   const groups = [], seen = {}
   for (const item of items) {
     const key = dateKey(item.createdAt)
     if (!seen[key]) {
-      seen[key] = { label: dateLabel(item.createdAt), items: [], total: 0 }
+      seen[key] = { label: sanaLabel(item.createdAt), items: [], total: 0 }
       groups.push(seen[key])
     }
     seen[key].items.push(item)
@@ -290,7 +279,10 @@ function QarzlarTab({ list, sum, onChanged }) {
           </a>
           <p className="text-sm text-text-sub mt-1">{qarzFlowers(q.flowers)}</p>
           <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
-            <span>{q.kassa?.name || 'Kassa'} · {soat(q.createdAt)}{!q.isPaid ? ` · ${kunOldin(q.createdAt)}` : ''}</span>
+            <span>
+              {q.kassa?.name || 'Kassa'} · {sanaLabel(q.createdAt)}, {soat(q.createdAt)}
+              {!q.isPaid && kunKutdi(q.createdAt) ? ` · ${kunKutdi(q.createdAt)}` : ''}
+            </span>
             <QoldaBadge show={q.backfill} />
           </p>
 

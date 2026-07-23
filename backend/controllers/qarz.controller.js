@@ -143,7 +143,10 @@ exports.adminUpdate = async (req, res, next) => {
         const at = p.at ? new Date(p.at) : new Date()
         if (!Number.isFinite(amount) || amount <= 0 || isNaN(at.getTime()))
           return res.status(400).json({ message: "To'lov summasi yoki sanasi noto'g'ri" })
-        payments.push({ amount, at })
+        const usul = p.usul ?? null
+        if (usul !== null && !['naqt', 'karta'].includes(usul))
+          return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
+        payments.push({ amount, at, usul })
       }
       payments.sort((a, b) => a.at - b.at)
       qarz.payments = payments
@@ -192,6 +195,10 @@ exports.tolov = async (req, res, next) => {
     if (amount > remaining)
       return res.status(400).json({ message: `To'lov qoldiqdan (${remaining}) oshib ketdi` })
 
+    const usul = req.body.usul ?? null
+    if (usul !== null && !['naqt', 'karta'].includes(usul))
+      return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
+
     // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt.
     // Bu yerda sana muhim: daromad payments[].at bo'yicha hisoblanadi (stats.controller.js),
     // ya'ni fevralda to'langan pul fevral daromadiga tushishi kerak.
@@ -201,7 +208,7 @@ exports.tolov = async (req, res, next) => {
     if (at < qarz.createdAt)
       return res.status(400).json({ message: "To'lov sanasi qarz sanasidan oldin bo'lishi mumkin emas" })
 
-    qarz.payments.push({ amount, at })
+    qarz.payments.push({ amount, at, usul })
     qarz.payments.sort((a, b) => a.at - b.at)
     qarz.paidAmount += amount
     if (qarz.paidAmount >= qarz.totalPrice) {

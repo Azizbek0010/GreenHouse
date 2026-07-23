@@ -32,17 +32,29 @@ function dateRange(period, prev = false) {
 }
 
 // cr — sana diapazoni ({ $gte, $lte }) yoki {} (jami)
+//
+// Ikkita boshqa-boshqa ko'rsatkich hisoblanadi — buyurtmachi ikkalasini ham so'radi:
+//
+//   savdo  — o'sha kuni QANCHA SOTILGAN (aylanma). Qarzga berilgani ham shu yerda,
+//            chunki gul o'sha kuni ketgan. Sotuv sanasi bo'yicha.
+//   tushum — kassaga QANCHA PUL KELGAN. Qarz faqat to'langanda tushadi
+//            (eski xatti-harakat saqlanadi), to'lov sanasi bo'yicha.
+//
+// Ikkovini bitta raqamga qo'shib bo'lmaydi: qarzga sotilgan summa avval savdoga,
+// keyin to'langanda tushumga kirardi — bir pul ikki marta sanalib ketardi.
 async function calcStats(cr, kassaId = null) {
   const hasRange   = cr && Object.keys(cr).length > 0
-  const sotuvMatch = { ...(hasRange ? { createdAt: cr } : {}), ...(kassaId ? { kassa: kassaId } : {}) }
-  const atxodMatch = { ...(hasRange ? { createdAt: cr } : {}), status: 'approved', ...(kassaId ? { kassa: kassaId } : {}) }
+  const byDate     = hasRange ? { createdAt: cr } : {}
+  const byKassa    = kassaId ? { kassa: kassaId } : {}
+  const sotuvMatch = { ...byDate, ...byKassa }
+  const atxodMatch = { ...byDate, status: 'approved', ...byKassa }
   // Variant A: qarzdan tushum — to'lov qilingan sana (payments.at) bo'yicha
-  const qarzMatch  = { ...(hasRange ? { 'payments.at': cr } : {}), ...(kassaId ? { kassa: kassaId } : {}) }
+  const tolovMatch = { ...(hasRange ? { 'payments.at': cr } : {}), ...byKassa }
 
-  const [sotuvAgg, atxodAgg, qarzAgg] = await Promise.all([
+  const [sotuvAgg, atxodAgg, tolovAgg, qarzSotuvAgg] = await Promise.all([
     Sotuv.aggregate([
       { $match: sotuvMatch },
-      { $group: { _id: null, daromad: { $sum: '$totalPrice' }, sotildi: { $sum: '$qty' } } },
+      { $group: { _id: '$tolov', summa: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
     ]),
     Atxod.aggregate([
       { $match: atxodMatch },
@@ -50,16 +62,53 @@ async function calcStats(cr, kassaId = null) {
     ]),
     Qarz.aggregate([
       { $unwind: '$payments' },
-      { $match: qarzMatch },
-      { $group: { _id: null, qarzDaromad: { $sum: '$payments.amount' } } },
+      { $match: tolovMatch },
+      { $group: { _id: '$payments.usul', summa: { $sum: '$payments.amount' } } },
+    ]),
+    // Shu davrda qarzga sotilgani — qarz ochilgan sana bo'yicha.
+    // $unwind ishlatilmaydi: u totalPrice ni har bir gul uchun takrorlab,
+    // summani gul turlari soniga ko'paytirib yuborardi. Ichki $sum massiv ustidan.
+    Qarz.aggregate([
+      { $match: sotuvMatch },
+      { $group: { _id: null, summa: { $sum: '$totalPrice' }, qty: { $sum: { $sum: '$flowers.qty' } } } },
     ]),
   ])
+
+  // Eski yozuvlarda tolov/usul = null — ular "noma'lum" guruhiga tushadi
+  const pick = (rows, key) => rows.find(r => r._id === key)?.summa ?? 0
+  const sum  = rows => rows.reduce((s, r) => s + r.summa, 0)
+
+  const sotuvJami   = sum(sotuvAgg)
+  const sotildi     = sotuvAgg.reduce((s, r) => s + r.qty, 0)
+  const tolovJami   = sum(tolovAgg)
+  const qarzSotuv   = qarzSotuvAgg[0]?.summa ?? 0
+  const qarzSotuvQty= qarzSotuvAgg[0]?.qty ?? 0
+
   return {
-    daromad:      (sotuvAgg[0]?.daromad ?? 0) + (qarzAgg[0]?.qarzDaromad ?? 0),
-    qarzDaromad:  qarzAgg[0]?.qarzDaromad ?? 0,
-    sotildi:      sotuvAgg[0]?.sotildi ?? 0,
+    // Tushum — kassaga kelgan haqiqiy pul (eski xatti-harakat, o'zgarmagan)
+    daromad:      sotuvJami + tolovJami,
+    qarzDaromad:  tolovJami,
+    sotildi,
     yoqotish:     atxodAgg[0]?.yoqotish ?? 0,
     atxodQty:     atxodAgg[0]?.qty ?? 0,
+
+    // Aylanma — shu davrda sotilgani (qarzga berilgani ham kiradi)
+    savdo: {
+      jami:    sotuvJami + qarzSotuv,
+      naqt:    pick(sotuvAgg, 'naqt'),
+      karta:   pick(sotuvAgg, 'karta'),
+      qarz:    qarzSotuv,
+      nomalum: pick(sotuvAgg, null),
+      gullar:  sotildi + qarzSotuvQty,
+    },
+    // Tushum — qanday kelgani bo'yicha (qarz to'lovlari ham shu yerda)
+    tushum: {
+      jami:    sotuvJami + tolovJami,
+      naqt:    pick(sotuvAgg, 'naqt')  + pick(tolovAgg, 'naqt'),
+      karta:   pick(sotuvAgg, 'karta') + pick(tolovAgg, 'karta'),
+      qarzdan: tolovJami,
+      nomalum: pick(sotuvAgg, null)    + pick(tolovAgg, null),
+    },
   }
 }
 
@@ -120,6 +169,8 @@ exports.adminStats = async (req, res, next) => {
       sotildi:   cur.sotildi,
       yoqotish:  cur.yoqotish,
       sof_foyda: cur.daromad - cur.yoqotish,
+      savdo:     cur.savdo,
+      tushum:    cur.tushum,
       prev: {
         daromad:  prev.daromad,
         sotildi:  prev.sotildi,
@@ -167,6 +218,8 @@ exports.kassaStats = async (req, res, next) => {
       daromad:     cur.daromad,
       qarzDaromad: cur.qarzDaromad,
       sotildi:     cur.sotildi,
+      savdo:       cur.savdo,
+      tushum:      cur.tushum,
       atxod: Object.fromEntries(atxodAgg.map(a => [a._id, a.qty])),
     })
   } catch (err) {

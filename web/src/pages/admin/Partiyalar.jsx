@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
+import { soat, groupByDate } from '../../lib/date'
 
 const FILTERS = [
   { key: 'hammasi',       label: 'Hammasi' },
@@ -11,40 +12,10 @@ const FILTERS = [
   { key: 'farq_bor',      label: 'Farq' },
 ]
 
-const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
-
 function summarize(p) {
   // YANGI rejim: umumiy son. ESKI rejim: tur+razmer.
   if (p.sentTotal != null) return `${p.sentTotal} ta`
   return (p.sent || []).map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
-}
-function soat(d) {
-  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-}
-function dateKey(d) {
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
-}
-function dateLabel(d) {
-  const dt = new Date(d)
-  const today = new Date()
-  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
-  if (dateKey(dt) === dateKey(today))     return 'Bugun'
-  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
-  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
-}
-function groupByDate(items) {
-  const groups = []
-  const seen = {}
-  for (const item of items) {
-    const key = dateKey(item.createdAt)
-    if (!seen[key]) {
-      seen[key] = { label: dateLabel(item.createdAt), items: [] }
-      groups.push(seen[key])
-    }
-    seen[key].items.push(item)
-  }
-  return groups
 }
 function formatBatchId(id = '') {
   return id.replace(/^BATCH-/, 'PARTIYA-')

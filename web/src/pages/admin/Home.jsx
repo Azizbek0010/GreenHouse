@@ -4,6 +4,8 @@ import { Flower2, AlertTriangle, ChevronRight, ChevronDown, ChevronUp } from 'lu
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
 import { StatCard, Badge, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { groupByDate } from '../../lib/date'
+import SavdoCard from '../../components/SavdoCard'
 
 const PERIODS = [
   { key: 'kunlik',   label: 'Kunlik' },
@@ -12,7 +14,6 @@ const PERIODS = [
   { key: 'jami',     label: 'Jami' },
 ]
 
-const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function summarize(p) {
   // YANGI rejim: umumiy son. ESKI rejim: tur+razmer.
@@ -20,23 +21,6 @@ function summarize(p) {
   return (p.sent || []).map(f => `${f.type} ${f.sizes.reduce((s, x) => s + x.qty, 0)}ta`).join(', ')
 }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
-function dateKey(d) { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}` }
-function dateLabel(d) {
-  const dt = new Date(d), today = new Date(), yesterday = new Date()
-  yesterday.setDate(today.getDate() - 1)
-  if (dateKey(dt) === dateKey(today))     return 'Bugun'
-  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
-  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
-}
-function groupByDate(items) {
-  const groups = [], seen = {}
-  for (const item of items) {
-    const key = dateKey(item.createdAt)
-    if (!seen[key]) { seen[key] = { label: dateLabel(item.createdAt), items: [] }; groups.push(seen[key]) }
-    seen[key].items.push(item)
-  }
-  return groups
-}
 function farqLine(f) {
   const d = f.diff > 0 ? `+${f.diff}` : `${f.diff}`
   return `${f.type} ${f.sm}sm: kutilgan ${f.sent} ta, keldi ${f.received} ta (${d})`
@@ -139,6 +123,14 @@ export default function AdminHome() {
               {money(stats?.daromad)} <span className="text-lg font-medium text-white/70">so'm</span>
             </p>
           </div>
+
+          {/* Savdo taqsimoti — tanlangan davr bo'yicha naqt / karta / qarz */}
+          <SavdoCard
+            savdo={stats?.savdo}
+            tushum={stats?.tushum}
+            title={`Umumiy savdo · ${PERIODS.find(p => p.key === period)?.label ?? ''}`}
+            subtitle={`${stats?.savdo?.gullar || 0} ta gul sotilgan (qarzga berilgani bilan)`}
+          />
 
           {/* Stat cards */}
           <div className="flex gap-3 mb-4">

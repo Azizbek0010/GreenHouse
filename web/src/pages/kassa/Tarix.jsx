@@ -4,46 +4,16 @@ import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
 import SanaField from '../../components/SanaField'
-import { todayLocal } from '../../lib/date'
-
-const UZ_MONTHS =['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+import TolovField, { TolovBadge } from '../../components/TolovField'
+import { todayLocal, sanaLabel, soat, groupByDate } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function num(s)   { return parseInt(String(s).replace(/\s/g, '')) || 0 }
 function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
-function soat(d) {
-  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-}
-function kunOldin(d) {
+// Qarz qancha vaqtdan beri kutayotgani — sana bilan birga ko'rsatiladi.
+function kunKutdi(d) {
   const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
-  if (days <= 0) return 'Bugun'
-  if (days === 1) return 'Kecha'
-  return `${days} kun oldin`
-}
-function dateKey(d) {
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
-}
-function dateLabel(d) {
-  const dt = new Date(d)
-  const today = new Date()
-  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
-  if (dateKey(dt) === dateKey(today))     return 'Bugun'
-  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
-  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
-}
-function groupByDate(items, dateOf = it => it.createdAt) {
-  const groups = []
-  const seen = {}
-  for (const item of items) {
-    const key = dateKey(dateOf(item))
-    if (!seen[key]) {
-      seen[key] = { label: dateLabel(dateOf(item)), items: [] }
-      groups.push(seen[key])
-    }
-    seen[key].items.push(item)
-  }
-  return groups
+  return days <= 0 ? '' : `${days} kun kutilmoqda`
 }
 function flowersSummary(flowers = []) {
   return flowers.map(f => `${f.type} ${f.razmer}sm · ${f.qty} ta`).join(', ')
@@ -108,6 +78,7 @@ const STATUS_MAP  = {
 function TolovModal({ qarz, onClose, onPaid }) {
   const [amount, setAmount] = useState('')
   const [sana, setSana]     = useState('')   // bo'sh = bugun
+  const [usul, setUsul]     = useState('naqt')
   const [paying, setPaying] = useState(false)
   const [error, setError]   = useState('')
   if (!qarz) return null
@@ -120,7 +91,7 @@ function TolovModal({ qarz, onClose, onPaid }) {
     if (val > remaining)     return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
     setError(''); setPaying(true)
     try {
-      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val, sana: sana || undefined })
+      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val, usul, sana: sana || undefined })
       onPaid()
     } catch (e) {
       setError(e.message)
@@ -167,6 +138,9 @@ function TolovModal({ qarz, onClose, onPaid }) {
           To'liq to'lash ({money(remaining)} so'm)
         </button>
 
+        {/* Pul qanday keldi — naqt yoki karta */}
+        <TolovField value={usul} onChange={setUsul} className="mb-4" />
+
         {/* To'lov sanasi — ixtiyoriy. Daromad shu sana bo'yicha hisoblanadi */}
         <SanaField
           value={sana}
@@ -212,7 +186,8 @@ function QarzCard({ q, onPay }) {
             </a>
             <p className="text-xs text-text-sub mt-1">{flowersSummary(q.flowers)}</p>
             <p className="text-xs text-text-sub/60 mt-0.5">
-              {soat(q.createdAt)}{!q.isPaid ? ` · ${kunOldin(q.createdAt)}` : ''}
+              {sanaLabel(q.createdAt)}, {soat(q.createdAt)}
+              {!q.isPaid && kunKutdi(q.createdAt) ? ` · ${kunKutdi(q.createdAt)}` : ''}
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -365,6 +340,7 @@ export default function KassaTarix() {
                               {it.holat === 'nuqsonli' && (
                                 <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-medium">Nuqsonli</span>
                               )}
+                              <TolovBadge value={it.tolov} />
                             </div>
                             <p className="text-xs text-text-sub mt-1">{it.qty} ta · {money(it.pricePerUnit)} so'm/dona</p>
                             <p className="text-xs text-text-sub/60 mt-0.5">{soat(it.createdAt)}</p>

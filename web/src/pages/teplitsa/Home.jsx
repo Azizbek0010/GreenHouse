@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Package, Flower2, Plus } from 'lucide-react'
 import { api } from '../../lib/api'
 import { StatCard, Badge, PrimaryButton, Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import { sanaLabel, soat } from '../../lib/date'
 
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
 // YANGI rejim: p.sentTotal (raqam). ESKI rejim: p.sent (tur+razmer).
@@ -87,6 +88,9 @@ export default function TeplitsaHome() {
                 <p className="text-sm font-semibold text-ctext">{formatBatchId(p.batchId)}</p>
                 <p className="text-xs text-text-sub mt-0.5">
                   {summarize(p)} → {p.kassa?.name || 'Kassa'}
+                </p>
+                <p className="text-xs text-text-sub/60 mt-0.5">
+                  {sanaLabel(p.createdAt)}, {soat(p.createdAt)}
                 </p>
               </div>
               <Badge status={p.status} />

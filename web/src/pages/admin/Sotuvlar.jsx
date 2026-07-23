@@ -2,32 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
-
-const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentyabr','oktyabr','noyabr','dekabr']
+import { sanaLabel, soat, dateKey } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
-function soat(d) {
-  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-}
-function dateKey(d) {
-  const dt = new Date(d)
-  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
-}
-function dateLabel(d) {
-  const dt = new Date(d)
-  const today = new Date()
-  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
-  if (dateKey(dt) === dateKey(today))     return 'Bugun'
-  if (dateKey(dt) === dateKey(yesterday)) return 'Kecha'
-  return `${dt.getDate()} ${UZ_MONTHS[dt.getMonth()]}`
-}
 function groupByDate(items) {
   const groups = []
   const seen = {}
   for (const item of items) {
     const key = dateKey(item.createdAt)
     if (!seen[key]) {
-      seen[key] = { label: dateLabel(item.createdAt), items: [], total: 0 }
+      seen[key] = { label: sanaLabel(item.createdAt), items: [], total: 0 }
       groups.push(seen[key])
     }
     seen[key].items.push(item)

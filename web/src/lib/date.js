@@ -28,3 +28,42 @@ export function formatSanaUz(sana) {
   const label = `${d}-${UZ_MONTHS[m - 1]}`
   return y === new Date().getFullYear() ? label : `${label}, ${y}`
 }
+
+// Bir kunni ajratuvchi kalit — guruhlash uchun.
+export function dateKey(d) {
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`
+}
+
+// Ro'yxatlardagi kun sarlavhasi: har doim aniq sana ('22-iyul').
+// "Bugun"/"Kecha" ataylab ishlatilmaydi — buyurtmachi aniq sanani so'radi:
+// ro'yxatni ochganda qaysi kun ekani darrov ko'rinishi kerak.
+export function sanaLabel(d) {
+  const dt = new Date(d)
+  const label = `${dt.getDate()}-${UZ_MONTHS[dt.getMonth()]}`
+  return dt.getFullYear() === new Date().getFullYear() ? label : `${label}, ${dt.getFullYear()}`
+}
+
+// '22-iyul, 14:30'
+export function sanaSoat(d) {
+  return `${sanaLabel(d)}, ${soat(d)}`
+}
+
+export function soat(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+// Yozuvlarni kun bo'yicha guruhlaydi. dateOf — sanani qayerdan olish kerakligi.
+export function groupByDate(items, dateOf = it => it.createdAt) {
+  const groups = []
+  const seen = {}
+  for (const item of items) {
+    const key = dateKey(dateOf(item))
+    if (!seen[key]) {
+      seen[key] = { key, label: sanaLabel(dateOf(item)), date: dateOf(item), items: [] }
+      groups.push(seen[key])
+    }
+    seen[key].items.push(item)
+  }
+  return groups
+}

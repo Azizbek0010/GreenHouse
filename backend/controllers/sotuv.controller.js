@@ -3,7 +3,10 @@ const { resolveSana, sanaFields } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
   try {
-    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, sana } = req.body
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, sana, tolov } = req.body
+
+    if (tolov != null && !['naqt', 'karta'].includes(tolov))
+      return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
 
     // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
     const s = resolveSana(sana)
@@ -30,6 +33,7 @@ exports.create = async (req, res, next) => {
       holat,
       pricePerUnit: priceN,
       discountPrice: discountN,
+      tolov: tolov ?? null,
       ...sanaFields(s),
     })
 
@@ -86,8 +90,13 @@ exports.adminUpdate = async (req, res, next) => {
     const sotuv = await Sotuv.findById(req.params.id)
     if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
 
-    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice } = req.body
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, tolov } = req.body
 
+    if (tolov !== undefined) {
+      if (tolov !== null && !['naqt', 'karta'].includes(tolov))
+        return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
+      sotuv.tolov = tolov
+    }
     if (flowerType !== undefined) {
       if (!flowerType || typeof flowerType !== 'string' || !flowerType.trim())
         return res.status(400).json({ message: "Gul turi noto'g'ri" })

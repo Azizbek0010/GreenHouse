@@ -6,6 +6,7 @@ import { ErrorMsg } from '../../components/ui'
 import SanaField from '../../components/SanaField'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
 import RazmerButtons from '../../components/RazmerButtons'
+import TolovField from '../../components/TolovField'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
 function num(s)      { return parseInt(String(s).replace(/\s/g, '')) || 0 }
@@ -103,6 +104,7 @@ export default function Sotuv() {
   const navigate = useNavigate()
   const [items, setItems]   = useState([newItem()])
   const [sana, setSana]     = useState('')   // bo'sh = bugun
+  const [tolov, setTolov]   = useState('naqt')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -131,6 +133,7 @@ export default function Sotuv() {
         holat:        it.holat,
         pricePerUnit: num(it.narx),
         discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
+        tolov,
         sana: sana || undefined,
       })))
       navigate('/kassa')
@@ -194,6 +197,9 @@ export default function Sotuv() {
           )
         })}
       </div>
+
+      {/* To'lov usuli — naqt yoki karta */}
+      <TolovField value={tolov} onChange={setTolov} className="mb-5" />
 
       {/* Total */}
       {total > 0 && (
