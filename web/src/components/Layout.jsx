@@ -27,6 +27,7 @@ const NAV = {
     { to: '/kassa/qabul',  label: 'Qabul',       icon: Package },
     { to: '/kassa/sotuv',  label: 'Sotuv',       icon: ShoppingCart },
     { to: '/kassa/atxod',  label: 'Atxod',       icon: Trash2 },
+    { to: '/kassa/statistika', label: 'Statistika', icon: BarChart2 },
     { to: '/kassa/tarix',  label: 'Tarix',       icon: History },
   ],
 }

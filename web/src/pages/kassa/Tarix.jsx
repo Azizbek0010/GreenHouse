@@ -5,6 +5,7 @@ import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
 import SanaField from '../../components/SanaField'
 import TolovField, { TolovBadge } from '../../components/TolovField'
+import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
 import { todayLocal, sanaLabel, soat, groupByDate } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
@@ -243,6 +244,8 @@ export default function KassaTarix() {
   const [qarzSearch, setQarzSearch] = useState('')
   const [qarzSort, setQarzSort]     = useState('yangi')
   const [usulF, setUsulF]           = useState('hammasi')
+  // Sana filtri uchala tab uchun umumiy — tab almashganda tanlangan davr saqlanadi
+  const sanaF = useSanaFilter()
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -264,22 +267,36 @@ export default function KassaTarix() {
 
   const totalSotuv = sotuvlar.reduce((s, x) => s + x.totalPrice, 0)
   const paidQarz   = qarzlar.filter(q => q.isPaid)
-  const openQarz   = qarzlar.filter(q => !q.isPaid)
   // Variant A: daromad = odi sotuvlar + qarzdan haqiqatda tushgan pul (paidAmount)
   const daromad    = totalSotuv + qarzSum.totalPaid
 
   const onPaid = () => { setPayQarz(null); load() }
 
-  // Sotuvlar tab: odi sotuvlar + yopilgan qarzlar (tarixga tushgan) — sana bo'yicha
+  // Sotuvlar tab: odi sotuvlar + yopilgan qarzlar (tarixga tushgan) — sana bo'yicha.
+  // Yopilgan qarz uchun sana — to'langan kun, chunki tarixda u shu kuni ko'rinadi.
   const sotuvFeedAll = [
     ...sotuvlar.map(s => ({ ...s, _kind: 'sotuv', _date: s.createdAt })),
     ...paidQarz.map(q => ({ ...q, _kind: 'qarz', _date: q.paidAt || q.createdAt })),
   ].sort((a, b) => new Date(b._date) - new Date(a._date))
 
-  const sotuvFeed = usulF === 'hammasi'
-    ? sotuvFeedAll
-    : sotuvFeedAll.filter(it => yozuvUsullari(it).includes(usulF))
+  const sotuvFeed = sanaF
+    .filter(usulF === 'hammasi' ? sotuvFeedAll : sotuvFeedAll.filter(it => yozuvUsullari(it).includes(usulF)),
+            it => it._date)
   const feedTotal = sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
+
+  // Qarz va atxod tablari — yozuv ochilgan sana bo'yicha
+  const qarzShown  = sanaF.filter(qarzlar)
+  const atxodShown = sanaF.filter(atxodlar)
+  const openQarz   = qarzShown.filter(q => !q.isPaid)
+  const paidShown  = qarzShown.filter(q => q.isPaid)
+  // Sana tanlanganida server jamlari to'g'ri kelmaydi — ko'rinib turgan yozuvlardan qayta hisoblanadi
+  const qarzJami = sanaF.active
+    ? {
+        totalQarz: qarzShown.reduce((s, q) => s + q.totalPrice, 0),
+        totalPaid: qarzShown.reduce((s, q) => s + q.paidAmount, 0),
+        qoldiq:    qarzShown.reduce((s, q) => s + (q.totalPrice - q.paidAmount), 0),
+      }
+    : qarzSum
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -326,6 +343,13 @@ export default function KassaTarix() {
 
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
+      {/* Sana bo'yicha qidiruv — uchala tab uchun */}
+      <SanaFilter
+        f={sanaF}
+        count={tab === 'sotuv' ? sotuvFeed.length : tab === 'qarz' ? qarzShown.length : atxodShown.length}
+        className="mb-4"
+      />
+
       {loading ? <Spinner /> : tab === 'sotuv' ? (
         <>
           {/* To'lov usuli bo'yicha filtr — karta va naqd alohida ko'rinishi uchun */}
@@ -354,13 +378,14 @@ export default function KassaTarix() {
                   {usulF === 'hammasi' ? 'Jami daromad' : `Jami · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
                 </p>
                 <p className="text-xs text-cgreen/70 mt-0.5">
-                  {usulF === 'hammasi'
+                  {/* Sana yoki usul tanlansa — faqat ko'rinib turgan yozuvlar sanaladi */}
+                  {usulF === 'hammasi' && !sanaF.active
                     ? `${sotuvlar.length} ta sotuv${qarzSum.totalPaid > 0 ? ` + qarzdan ${money(qarzSum.totalPaid)}` : ''}`
                     : `${sotuvFeed.length} ta yozuv`}
                 </p>
               </div>
               <p className="text-xl font-bold text-cgreen">
-                {money(usulF === 'hammasi' ? daromad : feedTotal)} <span className="text-sm font-normal">so'm</span>
+                {money(usulF === 'hammasi' && !sanaF.active ? daromad : feedTotal)} <span className="text-sm font-normal">so'm</span>
               </p>
             </div>
           )}
@@ -422,24 +447,26 @@ export default function KassaTarix() {
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="bg-ccard border border-cborder rounded-2xl p-3 text-center">
               <p className="text-[11px] text-text-sub">Umumiy qarz</p>
-              <p className="text-sm font-bold text-ctext mt-1">{money(qarzSum.totalQarz)}</p>
+              <p className="text-sm font-bold text-ctext mt-1">{money(qarzJami.totalQarz)}</p>
             </div>
             <div className="bg-green-bg border border-cgreen/20 rounded-2xl p-3 text-center">
               <p className="text-[11px] text-cgreen/80">To'langan</p>
-              <p className="text-sm font-bold text-cgreen mt-1">{money(qarzSum.totalPaid)}</p>
+              <p className="text-sm font-bold text-cgreen mt-1">{money(qarzJami.totalPaid)}</p>
             </div>
             <div className="bg-orange-bg border border-corange/20 rounded-2xl p-3 text-center">
               <p className="text-[11px] text-corange/80">Qoldiq</p>
-              <p className="text-sm font-bold text-corange mt-1">{money(qarzSum.qoldiq)}</p>
+              <p className="text-sm font-bold text-corange mt-1">{money(qarzJami.qoldiq)}</p>
             </div>
           </div>
 
-          {qarzlar.length === 0 ? <EmptyState text="Hozircha qarz yo'q" /> : (
+          {qarzShown.length === 0 ? (
+            <EmptyState text={sanaF.active ? 'Bu sanada qarz yo\'q' : "Hozircha qarz yo'q"} />
+          ) : (
             <>
               <QarzSearchSort search={qarzSearch} onSearch={setQarzSearch} sort={qarzSort} onSort={setQarzSort} />
               {(() => {
                 const openFiltered = filterSortQarz(openQarz, qarzSearch, qarzSort)
-                const paidFiltered = filterSortQarz(paidQarz, qarzSearch, qarzSort)
+                const paidFiltered = filterSortQarz(paidShown, qarzSearch, qarzSort)
                 if (openFiltered.length === 0 && paidFiltered.length === 0)
                   return <EmptyState text="Qidiruv bo'yicha hech narsa topilmadi" />
                 return (
@@ -463,9 +490,11 @@ export default function KassaTarix() {
           )}
         </>
       ) : (
-        atxodlar.length === 0 ? <EmptyState text="Hozircha atxod yo'q" /> : (
+        atxodShown.length === 0 ? (
+          <EmptyState text={sanaF.active ? "Bu sanada atxod yo'q" : "Hozircha atxod yo'q"} />
+        ) : (
           <div>
-            {groupByDate(atxodlar).map(group => (
+            {groupByDate(atxodShown).map(group => (
               <div key={group.label}>
                 <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-7 pb-2.5 first:pt-0">
                   {group.label}

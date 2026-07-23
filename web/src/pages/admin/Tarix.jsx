@@ -4,6 +4,7 @@ import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandC
 import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import QarzEditModal from '../../components/QarzEditModal'
+import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
 import { sanaLabel, soat, dateKey } from '../../lib/date'
 import { TolovBadge } from '../../components/TolovField'
 
@@ -536,6 +537,8 @@ export default function AdminTarix() {
   const [partiyalar, setPartiyalar] = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState('')
+  // Sana filtri barcha tablar uchun umumiy — tab almashganda davr saqlanadi
+  const sanaF = useSanaFilter()
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -557,7 +560,28 @@ export default function AdminTarix() {
 
   useEffect(() => { load() }, [load])
 
-  const counts = { sotuv: sotuvlar.length, qarz: qarzlar.filter(q => !q.isPaid).length, atxod: atxodlar.length, partiya: partiyalar.length }
+  // Sana bo'yicha qidiruv — hamma tablar bitta filtrdan o'tadi
+  const sotuvShown   = sanaF.filter(sotuvlar)
+  const qarzShown    = sanaF.filter(qarzlar)
+  const atxodShown   = sanaF.filter(atxodlar)
+  const partiyaShown = sanaF.filter(partiyalar)
+
+  // Sana tanlanganida server jamlari mos kelmaydi — ko'rinayotgan yozuvlardan qayta hisoblanadi
+  const qarzJami = sanaF.active
+    ? {
+        totalQarz: qarzShown.reduce((s, q) => s + q.totalPrice, 0),
+        totalPaid: qarzShown.reduce((s, q) => s + q.paidAmount, 0),
+        qoldiq:    qarzShown.reduce((s, q) => s + (q.totalPrice - q.paidAmount), 0),
+      }
+    : qarzSum
+
+  const counts = {
+    sotuv:   sotuvShown.length,
+    qarz:    qarzShown.filter(q => !q.isPaid).length,
+    atxod:   atxodShown.length,
+    partiya: partiyaShown.length,
+  }
+  const shownCount = { sotuv: sotuvShown.length, qarz: qarzShown.length, atxod: atxodShown.length, partiya: partiyaShown.length }[tab]
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -595,12 +619,15 @@ export default function AdminTarix() {
 
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
+      {/* Sana bo'yicha qidiruv — barcha tablar uchun */}
+      <SanaFilter f={sanaF} count={shownCount} className="mb-4" />
+
       {loading ? <Spinner /> : (
         <>
-          {tab === 'sotuv'   && <SotuvlarTab  list={sotuvlar}   />}
-          {tab === 'qarz'    && <QarzlarTab   list={qarzlar} sum={qarzSum} onChanged={load} />}
-          {tab === 'atxod'   && <AtxodlarTab  list={atxodlar}   />}
-          {tab === 'partiya' && <PartiyalarTab list={partiyalar} />}
+          {tab === 'sotuv'   && <SotuvlarTab  list={sotuvShown}   />}
+          {tab === 'qarz'    && <QarzlarTab   list={qarzShown} sum={qarzJami} onChanged={load} />}
+          {tab === 'atxod'   && <AtxodlarTab  list={atxodShown}   />}
+          {tab === 'partiya' && <PartiyalarTab list={partiyaShown} />}
         </>
       )}
     </div>

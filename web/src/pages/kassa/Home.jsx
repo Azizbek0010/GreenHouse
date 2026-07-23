@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight, HandCoins } from 'lucide-react'
+import { DollarSign, Flower2, Package, Plus, Trash2, ChevronRight, HandCoins, BarChart2 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { api } from '../../lib/api'
 import { StatCard, Badge, PrimaryButton, Spinner, ErrorMsg } from '../../components/ui'
 import { sanaLabel, soat } from '../../lib/date'
 import SavdoCard from '../../components/SavdoCard'
+import OyTaqqos from '../../components/OyTaqqos'
 import { TolovBadge } from '../../components/TolovField'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
@@ -21,6 +22,7 @@ export default function KassaHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [stats, setStats]       = useState({ daromad: 0, sotildi: 0 })
+  const [taqqos, setTaqqos]     = useState(null)
   const [yolda, setYolda]       = useState([])
   const [sotuvlar, setSotuvlar] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -29,12 +31,14 @@ export default function KassaHome() {
   const load = useCallback(async () => {
     setError('')
     try {
-      const [st, partiyalar, sales] = await Promise.all([
+      const [st, tq, partiyalar, sales] = await Promise.all([
         api.get('/api/stats/kassa?period=kunlik'),
+        api.get('/api/stats/oy-taqqos'),
         api.get('/api/partiya'),
         api.get('/api/sotuv'),
       ])
       setStats(st)
+      setTaqqos(tq)
       setYolda(partiyalar.filter(p => p.status === 'yolda'))
       setSotuvlar(sales.sotuvlar.slice(0, 10))
     } catch (e) {
@@ -65,7 +69,7 @@ export default function KassaHome() {
           {/* "Bugungi tushum" kartochkasi olib tashlandi: u SavdoCard ichidagi
               "Kassaga tushgan pul" bilan bir xil raqam edi — bitta summa ikki
               joyda turib, ikkita boshqa raqamdek ko'rinardi */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-3 mb-4">
             <StatCard
               label="Sotilgan gullar"
               value={String(stats.savdo?.gullar ?? stats.sotildi)}
@@ -75,6 +79,22 @@ export default function KassaHome() {
               textColor="text-primary"
             />
           </div>
+
+          {/* Oylik taqqoslash — o'tgan oy bilan farq. To'liq statistika alohida sahifada */}
+          <OyTaqqos data={taqqos} className="mb-3" />
+          <button
+            onClick={() => navigate('/kassa/statistika')}
+            className="w-full flex items-center gap-3 p-4 mb-6 bg-ccard border border-cborder rounded-2xl hover:border-primary transition-colors text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-bg flex items-center justify-center shrink-0">
+              <BarChart2 size={17} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ctext">Batafsil statistika</p>
+              <p className="text-xs text-text-sub mt-0.5">Grafik, gul turlari, kunlik va oylik hisob</p>
+            </div>
+            <ChevronRight size={16} className="text-cborder shrink-0" />
+          </button>
 
           {/* Qabul section */}
           <div className="flex items-center gap-2 mb-3">

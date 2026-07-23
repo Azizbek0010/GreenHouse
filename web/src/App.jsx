@@ -27,6 +27,7 @@ import KassaSotuv      from './pages/kassa/Sotuv'
 import KassaQarzSotuv  from './pages/kassa/QarzSotuv'
 import KassaAtxod      from './pages/kassa/Atxod'
 import KassaTarix      from './pages/kassa/Tarix'
+import KassaStatistika from './pages/kassa/Statistika'
 
 import Profil          from './pages/Profil'
 
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="/kassa/qarz"   element={<PrivateRoute role="kassa"><KassaQarzSotuv /></PrivateRoute>} />
             <Route path="/kassa/atxod"  element={<PrivateRoute role="kassa"><KassaAtxod /></PrivateRoute>} />
             <Route path="/kassa/tarix"  element={<PrivateRoute role="kassa"><KassaTarix /></PrivateRoute>} />
+            <Route path="/kassa/statistika" element={<PrivateRoute role="kassa"><KassaStatistika /></PrivateRoute>} />
 
             {/* Profil (barcha rollar) */}
             <Route path="/profil" element={<PrivateRoute><Profil /></PrivateRoute>} />

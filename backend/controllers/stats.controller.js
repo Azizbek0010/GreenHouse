@@ -5,19 +5,60 @@ const Partiya = require('../models/Partiya')
 const Qarz    = require('../models/Qarz')
 const FlowerType = require('../models/FlowerType')
 
+// Asia/Tashkent = UTC+5. Server UTC da ishlashi mumkin (Render), buyurtmachi esa
+// Toshkentda — kun va oy chegaralari server TZ siga qarab siljib ketmasligi kerak.
+// Aks holda 31-sana kechqurun sotilgani keyingi oyga tushib qolardi.
+const TZ_MS = 5 * 60 * 60 * 1000
+
+// Toshkent bo'yicha kun boshi (00:00), UTC Date sifatida
+function kunBoshi(d = new Date()) {
+  const t = new Date(d.getTime() + TZ_MS)
+  t.setUTCHours(0, 0, 0, 0)
+  return new Date(t.getTime() - TZ_MS)
+}
+
+// Toshkent bo'yicha kalendar oy chegarasi.
+// offset: 0 — shu oy (1-sanadan hozirgacha), -1 — o'tgan oy (to'liq).
+// Kalendar oy ataylab, sirg'aluvchi 30 kun emas: buyurtmachi
+// "farq har oyning birinchi sanasida yangilanadi" deb so'radi.
+function oyChegara(offset = 0, now = new Date()) {
+  const t = new Date(now.getTime() + TZ_MS)
+  const y = t.getUTCFullYear(), m = t.getUTCMonth()
+  return {
+    $gte: new Date(Date.UTC(y, m + offset, 1) - TZ_MS),
+    $lte: offset === 0
+      ? new Date(now)
+      : new Date(Date.UTC(y, m + offset + 1, 1) - TZ_MS - 1),
+  }
+}
+
+// O'tgan oyning shu kunigacha bo'lgan qismi — halol taqqoslash uchun:
+// 24 kunlik oyni to'liq oy bilan solishtirish har doim "tushib ketdi" ko'rsatadi.
+function oyShuKungacha(offset = -1, now = new Date()) {
+  const t = new Date(now.getTime() + TZ_MS)
+  const y = t.getUTCFullYear(), m = t.getUTCMonth(), d = t.getUTCDate()
+  const oyKunlari = new Date(Date.UTC(y, m + offset + 1, 0)).getUTCDate()
+  const kun = Math.min(d, oyKunlari)   // 31-mart -> fevralda 28/29
+  return {
+    $gte: new Date(Date.UTC(y, m + offset, 1) - TZ_MS),
+    $lte: new Date(Date.UTC(y, m + offset, kun + 1) - TZ_MS - 1),
+  }
+}
+
 function dateRange(period, prev = false) {
   if (period === 'jami') return {}
   const now = new Date()
   let from = new Date(), to = new Date(now)
 
   if (!prev) {
-    if (period === 'kunlik')   { from = new Date(); from.setHours(0,0,0,0) }
+    if (period === 'kunlik')   { from = kunBoshi() }
     if (period === 'haftalik') { from = new Date(); from.setDate(now.getDate() - 7) }
     if (period === 'oylik')    { from = new Date(); from.setMonth(now.getMonth() - 1) }
   } else {
     if (period === 'kunlik') {
-      from = new Date(); from.setDate(from.getDate()-1); from.setHours(0,0,0,0)
-      to   = new Date(); to.setDate(to.getDate()-1);     to.setHours(23,59,59,999)
+      const b = kunBoshi()
+      from = new Date(b.getTime() - 86400000)
+      to   = new Date(b.getTime() - 1)
     }
     if (period === 'haftalik') {
       from = new Date(); from.setDate(from.getDate()-14)
@@ -112,6 +153,78 @@ async function calcStats(cr, kassaId = null) {
   }
 }
 
+// Gul turlari bo'yicha sotuv — Sotuv + Qarz birga.
+// Qarzga berilgan gullar ham sotilgan hisoblanadi (savdo bloki bilan bir xil mantiq),
+// aks holda "qaysi gul ko'p ketdi" degan javob qarzlarni ko'rmay noto'g'ri chiqardi.
+async function gulTurlari(cr, kassaId = null) {
+  const hasRange = cr && Object.keys(cr).length > 0
+  const match = { ...(hasRange ? { createdAt: cr } : {}), ...(kassaId ? { kassa: kassaId } : {}) }
+
+  const [sotuv, qarz] = await Promise.all([
+    Sotuv.aggregate([
+      { $match: match },
+      { $group: {
+          _id: { $trim: { input: '$flowerType' } },
+          qty: { $sum: '$qty' },
+          daromad: { $sum: '$totalPrice' },
+      } },
+    ]),
+    // Bu yerda $unwind kerak — bitta qarzda bir necha tur bo'ladi.
+    // Summa gulning o'z narxidan olinadi (qarzning totalPrice idan emas),
+    // shuning uchun takrorlanish yo'q. Hisob qarz.controller dagi
+    // flowerTotal() bilan bir xil: chegirma bo'lsa — chegirma yakuniy narx.
+    Qarz.aggregate([
+      { $match: match },
+      { $unwind: '$flowers' },
+      { $group: {
+          _id: { $trim: { input: '$flowers.type' } },
+          qty: { $sum: '$flowers.qty' },
+          daromad: { $sum: {
+            $ifNull: ['$flowers.discountPrice', { $multiply: ['$flowers.pricePerUnit', '$flowers.qty'] }],
+          } },
+      } },
+    ]),
+  ])
+
+  const map = new Map()
+  for (const r of [...sotuv, ...qarz]) {
+    const cur = map.get(r._id) || { _id: r._id, qty: 0, daromad: 0 }
+    cur.qty += r.qty
+    cur.daromad += r.daromad
+    map.set(r._id, cur)
+  }
+  return [...map.values()].sort((a, b) => b.daromad - a.daromad)
+}
+
+// Grafik uchun qatorlar: Sotuv + Qarz bitta seriyaga jamlanadi.
+// Qarz ham kiradi — gul o'sha kuni sotilgan, faqat puli keyinroq keladi.
+// Qarzda $unwind ataylab yo'q: u totalPrice ni gul turlari soniga ko'paytirib yuborardi
+// (qty esa massiv ustidan ichki $sum bilan olinadi).
+// timezone: '+05:00' — kun Toshkent bo'yicha ajratiladi, UTC bo'yicha emas.
+async function seriesMap(fmt, from, kassaId = null) {
+  const match = { createdAt: { $gte: from }, ...(kassaId ? { kassa: kassaId } : {}) }
+  const grp = (daromad, qty) => ({
+    $group: { _id: { $dateToString: { format: fmt, date: '$createdAt', timezone: '+05:00' } }, daromad, qty },
+  })
+
+  const [sotuv, qarz] = await Promise.all([
+    Sotuv.aggregate([{ $match: match }, grp({ $sum: '$totalPrice' }, { $sum: '$qty' })]),
+    Qarz.aggregate([{ $match: match }, grp({ $sum: '$totalPrice' }, { $sum: { $sum: '$flowers.qty' } })]),
+  ])
+
+  const map = {}
+  for (const r of [...sotuv, ...qarz]) {
+    const cur = map[r._id] || (map[r._id] = { daromad: 0, qty: 0 })
+    cur.daromad += r.daromad
+    cur.qty     += r.qty
+  }
+  return map
+}
+
+// Toshkent bo'yicha kalit — seriesMap dagi $dateToString bilan bir xil bo'lishi shart
+const kunKalit = d => new Date(d.getTime() + TZ_MS).toISOString().slice(0, 10)
+const oyKalit  = d => new Date(d.getTime() + TZ_MS).toISOString().slice(0, 7)
+
 exports.adminStats = async (req, res, next) => {
   try {
     const period = req.query.period || 'kunlik'
@@ -127,11 +240,7 @@ exports.adminStats = async (req, res, next) => {
     const [cur, prev, byType, atxodBySabab, farqCount, partiyaAgg, sotuvWeek, qarzWeek, allTypes] = await Promise.all([
       calcStats(cr),
       calcStats(prevCr),
-      Sotuv.aggregate([
-        { $match: dateFilter },
-        { $group: { _id: '$flowerType', qty: { $sum: '$qty' }, daromad: { $sum: '$totalPrice' } } },
-        { $sort: { daromad: -1 } },
-      ]),
+      gulTurlari(cr),
       Atxod.aggregate([
         { $match: { ...dateFilter, status: 'approved' } },
         { $group: { _id: '$sabab', qty: { $sum: '$qty' } } },
@@ -206,11 +315,13 @@ exports.kassaStats = async (req, res, next) => {
     const kassaId = mongoose.Types.ObjectId.createFromHexString(req.user.id)
 
     // daromad (odi sotuv + qarz to'lovlari) va sotildi — calcStats orqali
-    const cur = await calcStats(createdAt, kassaId)
-
-    const atxodAgg = await Atxod.aggregate([
-      { $match: { ...dateFilter, kassa: kassaId } },
-      { $group: { _id: '$status', qty: { $sum: '$qty' } } },
+    const [cur, turlar, atxodAgg] = await Promise.all([
+      calcStats(createdAt, kassaId),
+      gulTurlari(createdAt, kassaId),
+      Atxod.aggregate([
+        { $match: { ...dateFilter, kassa: kassaId } },
+        { $group: { _id: '$status', qty: { $sum: '$qty' } } },
+      ]),
     ])
 
     res.json({
@@ -220,6 +331,7 @@ exports.kassaStats = async (req, res, next) => {
       sotildi:     cur.sotildi,
       savdo:       cur.savdo,
       tushum:      cur.tushum,
+      gul_turlari: turlar,
       atxod: Object.fromEntries(atxodAgg.map(a => [a._id, a.qty])),
     })
   } catch (err) {
@@ -227,90 +339,124 @@ exports.kassaStats = async (req, res, next) => {
   }
 }
 
-// Chart — period bo'yicha daromad grafigi
-exports.adminChart = async (req, res, next) => {
+// Chart — davr bo'yicha savdo grafigi. Har nuqtada ikkala o'lchov ham bor:
+// daromad (pul) va qty (gullar soni) — frontend qaysi birini chizishni o'zi tanlaydi.
+// Kassa faqat o'zinikini ko'radi, admin — hammasini.
+exports.chart = async (req, res, next) => {
   try {
     const type = req.query.type || 'daily'
     const now  = new Date()
+    const kassaId = req.user.role === 'kassa'
+      ? mongoose.Types.ObjectId.createFromHexString(req.user.id)
+      : null
 
     // ── Kunlik: oxirgi 14 kun ──
     if (type === 'daily') {
-      const from = new Date(now); from.setDate(from.getDate() - 13); from.setHours(0,0,0,0)
-      const rows = await Sotuv.aggregate([
-        { $match: { createdAt: { $gte: from } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, daromad: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
-        { $sort: { _id: 1 } },
-      ])
-      const map = Object.fromEntries(rows.map(r => [r._id, r]))
-      const result = []
+      const from = kunBoshi(new Date(now.getTime() - 13 * 86400000))
+      const map  = await seriesMap('%Y-%m-%d', from, kassaId)
+      const data = []
       for (let i = 13; i >= 0; i--) {
-        const d = new Date(now); d.setDate(d.getDate() - i)
-        const key = d.toISOString().slice(0, 10)
-        result.push({ date: key, daromad: map[key]?.daromad ?? 0, qty: map[key]?.qty ?? 0 })
+        const key = kunKalit(new Date(now.getTime() - i * 86400000))
+        data.push({ date: key, daromad: map[key]?.daromad ?? 0, qty: map[key]?.qty ?? 0 })
       }
-      return res.json({ type: 'daily', data: result })
+      return res.json({ type: 'daily', data })
     }
 
-    // ── Haftalik: oxirgi 8 hafta ──
+    // ── Haftalik: oxirgi 8 hafta (kunlar haftalarga jamlanadi) ──
     if (type === 'weekly') {
-      const from = new Date(now); from.setDate(from.getDate() - 55); from.setHours(0,0,0,0)
-      const rows = await Sotuv.aggregate([
-        { $match: { createdAt: { $gte: from } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, daromad: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
-        { $sort: { _id: 1 } },
-      ])
-      const dayMap = Object.fromEntries(rows.map(r => [r._id, r]))
-      // Haftalarga guruhlash (8 hafta)
-      const result = []
+      const from = kunBoshi(new Date(now.getTime() - 55 * 86400000))
+      const map  = await seriesMap('%Y-%m-%d', from, kassaId)
+      const data = []
       for (let w = 7; w >= 0; w--) {
-        let weekDaromad = 0, weekQty = 0
-        let weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - w * 7 - 6)
-        let weekEnd   = new Date(now); weekEnd.setDate(weekEnd.getDate() - w * 7)
-        for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
-          const key = d.toISOString().slice(0, 10)
-          weekDaromad += dayMap[key]?.daromad ?? 0
-          weekQty     += dayMap[key]?.qty ?? 0
+        let daromad = 0, qty = 0, label = null
+        for (let d = 6; d >= 0; d--) {
+          const key = kunKalit(new Date(now.getTime() - (w * 7 + d) * 86400000))
+          if (label === null) label = key            // hafta boshi sanasi
+          daromad += map[key]?.daromad ?? 0
+          qty     += map[key]?.qty ?? 0
         }
-        // Label: hafta boshi sanasi
-        const label = weekStart.toISOString().slice(0, 10)
-        result.push({ date: label, daromad: weekDaromad, qty: weekQty })
+        data.push({ date: label, daromad, qty })
       }
-      return res.json({ type: 'weekly', data: result })
+      return res.json({ type: 'weekly', data })
     }
 
-    // ── Oylik: oxirgi 6 oy ──
-    if (type === 'monthly') {
-      const from = new Date(now); from.setMonth(from.getMonth() - 5); from.setDate(1); from.setHours(0,0,0,0)
-      const rows = await Sotuv.aggregate([
-        { $match: { createdAt: { $gte: from } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, daromad: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
-        { $sort: { _id: 1 } },
-      ])
-      const map = Object.fromEntries(rows.map(r => [r._id, r]))
-      const result = []
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now); d.setMonth(d.getMonth() - i)
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-        result.push({ date: key, daromad: map[key]?.daromad ?? 0, qty: map[key]?.qty ?? 0 })
-      }
-      return res.json({ type: 'monthly', data: result })
+    // ── Oylik: oxirgi 6 oy · Jami: oxirgi 12 oy ──
+    const oylar = type === 'monthly' ? 6 : 12
+    const t     = new Date(now.getTime() + TZ_MS)
+    const y = t.getUTCFullYear(), m = t.getUTCMonth()
+    const from  = new Date(Date.UTC(y, m - (oylar - 1), 1) - TZ_MS)
+    const map   = await seriesMap('%Y-%m', from, kassaId)
+    const data  = []
+    for (let i = oylar - 1; i >= 0; i--) {
+      const key = oyKalit(new Date(Date.UTC(y, m - i, 1) - TZ_MS))
+      data.push({ date: key, daromad: map[key]?.daromad ?? 0, qty: map[key]?.qty ?? 0 })
     }
+    res.json({ type: type === 'monthly' ? 'monthly' : 'alltime', data })
+  } catch (err) {
+    next(err)
+  }
+}
 
-    // ── Jami: oxirgi 12 oy ──
-    const from = new Date(now); from.setFullYear(from.getFullYear() - 1); from.setDate(1); from.setHours(0,0,0,0)
-    const rows = await Sotuv.aggregate([
-      { $match: { createdAt: { $gte: from } } },
-      { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, daromad: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
-      { $sort: { _id: 1 } },
+// Eski nom — route lar buzilmasligi uchun
+exports.adminChart = exports.chart
+
+// Oylik taqqoslash — bu oy va o'tgan oy, kalendar oy bo'yicha (1-sanadan).
+// Buyurtmachi so'ragani: "o'tgan oy qancha gul sotildi va bu oy bilan farqi",
+// va farq har oyning birinchi sanasida noldan boshlanadi.
+//
+// Ikkita farq qaytadi:
+//   farq         — to'liq o'tgan oyga nisbatan (buyurtmachi so'ragan raqam)
+//   farqShuKunga — o'tgan oyning shu kunigacha bo'lgan qismiga nisbatan.
+// Ikkinchisi kerak: oy boshida 3 kunni to'liq oy bilan solishtirish
+// har doim "-90%" ko'rsatib, hech qanday ma'no bermaydi.
+exports.oyTaqqos = async (req, res, next) => {
+  try {
+    const now = new Date()
+    const kassaId = req.user.role === 'kassa'
+      ? mongoose.Types.ObjectId.createFromHexString(req.user.id)
+      : null
+
+    const [cur, prev, prevQisman] = await Promise.all([
+      calcStats(oyChegara(0, now), kassaId),
+      calcStats(oyChegara(-1, now), kassaId),
+      calcStats(oyShuKungacha(-1, now), kassaId),
     ])
-    const map = Object.fromEntries(rows.map(r => [r._id, r]))
-    const result = []
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now); d.setMonth(d.getMonth() - i)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      result.push({ date: key, daromad: map[key]?.daromad ?? 0, qty: map[key]?.qty ?? 0 })
-    }
-    res.json({ type: 'alltime', data: result })
+
+    // Oy raqami Toshkent bo'yicha — nomini frontend qo'yadi (UZ_MONTHS)
+    const t = new Date(now.getTime() + TZ_MS)
+    const y = t.getUTCFullYear(), m = t.getUTCMonth()
+    const otgan = new Date(Date.UTC(y, m - 1, 1))
+
+    const farq = (a, b) => ({
+      qiymat: a - b,
+      foiz:   b === 0 ? (a > 0 ? 100 : 0) : Math.round(((a - b) / b) * 100),
+    })
+
+    res.json({
+      buOy: {
+        oy: m, yil: y,
+        kun:    t.getUTCDate(),                                  // oyning nechanchi kuni
+        savdo:  cur.savdo.jami,
+        gullar: cur.savdo.gullar,
+        tushum: cur.tushum.jami,
+      },
+      otganOy: {
+        oy: otgan.getUTCMonth(), yil: otgan.getUTCFullYear(),
+        kunlar: new Date(Date.UTC(y, m, 0)).getUTCDate(),         // o'tgan oyda nechta kun bo'lgan
+        savdo:  prev.savdo.jami,
+        gullar: prev.savdo.gullar,
+        tushum: prev.tushum.jami,
+      },
+      otganOyShuKunga: { savdo: prevQisman.savdo.jami, gullar: prevQisman.savdo.gullar },
+      farq: {
+        savdo:  farq(cur.savdo.jami,   prev.savdo.jami),
+        gullar: farq(cur.savdo.gullar, prev.savdo.gullar),
+      },
+      farqShuKunga: {
+        savdo:  farq(cur.savdo.jami,   prevQisman.savdo.jami),
+        gullar: farq(cur.savdo.gullar, prevQisman.savdo.gullar),
+      },
+    })
   } catch (err) {
     next(err)
   }

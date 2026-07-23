@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, TrendingUp, TrendingDown, ChevronDown, Flower2, Trash2, Package, BarChart3 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
+import SavdoChart from '../../components/SavdoChart'
+import OyTaqqos from '../../components/OyTaqqos'
+import { money, Trend, MetricRow, BarRow, SLabel, StatPill } from '../../components/StatBits'
 
 const PERIODS = [
   { key: 'kunlik',   label: 'Kunlik',   prevLabel: 'Kecha' },
@@ -12,176 +15,12 @@ const PERIODS = [
 const SABAB_LABEL = { "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Singan', boshqa: 'Boshqa' }
 const SABAB_EMOJI = { "so'lgan": '🥀', nuqsonli: '⚠️', singan: '💔', boshqa: '📦' }
 
-function money(n) { return (n || 0).toLocaleString('ru-RU') }
-function shortMoney(n) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0','') + 'M'
-  if (n >= 1_000)     return (n / 1_000).toFixed(0) + 'K'
-  return String(n)
-}
-
-// ── SVG Bar Chart ──────────────────────────────────────────────────
-function BarChart({ data, chartType }) {
-  const W = 320, H = 160, PAD_L = 36, PAD_B = 28, PAD_T = 12, PAD_R = 8
-  const innerW = W - PAD_L - PAD_R
-  const innerH = H - PAD_T - PAD_B
-  const maxVal = Math.max(1, ...data.map(d => d.daromad))
-
-  // Split into current (last half) vs previous (first half)
-  const half     = Math.floor(data.length / 2)
-  const prevData = data.slice(0, half)
-  const curData  = data.slice(half)
-  const allData  = curData // show current period bars
-
-  const MONTHS = ['Yan','Feb','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek']
-
-  // Format x-axis label based on chart type
-  const fmtLabel = (dateStr) => {
-    const d = new Date(dateStr + 'T00:00:00')
-    if (chartType === 'daily')   return `${d.getDate()}/${d.getMonth()+1}`
-    if (chartType === 'weekly')  return `${d.getDate()}/${d.getMonth()+1}`
-    // monthly / alltime
-    return MONTHS[d.getMonth()]
-  }
-
-  const barW   = Math.floor((innerW / allData.length) * 0.6)
-  const barGap = innerW / allData.length
-
-  // Y grid lines
-  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => ({
-    y: PAD_T + innerH * (1 - f),
-    label: f === 0 ? '0' : shortMoney(maxVal * f),
-  }))
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
-      {/* Grid lines */}
-      {gridLines.map((g, i) => (
-        <g key={i}>
-          <line x1={PAD_L} y1={g.y} x2={W - PAD_R} y2={g.y}
-            stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" strokeDasharray="4 3" />
-          <text x={PAD_L - 4} y={g.y + 4} textAnchor="end"
-            fontSize="9" fill="currentColor" fillOpacity="0.4">{g.label}</text>
-        </g>
-      ))}
-
-      {/* Bars */}
-      {allData.map((d, i) => {
-        const bh   = Math.max(2, (d.daromad / maxVal) * innerH)
-        const x    = PAD_L + i * barGap + (barGap - barW) / 2
-        const y    = PAD_T + innerH - bh
-        // Previous period bar (lighter, behind)
-        const prevD = prevData[i]
-        const pbh   = prevD ? Math.max(2, (prevD.daromad / maxVal) * innerH) : 0
-        const px    = x - barW * 0.35
-        return (
-          <g key={i}>
-            {/* Prev period bar */}
-            {prevD && pbh > 0 && (
-              <rect x={px} y={PAD_T + innerH - pbh} width={barW * 0.5} height={pbh}
-                rx="3" fill="currentColor" fillOpacity="0.12" />
-            )}
-            {/* Current bar */}
-            <rect x={x} y={y} width={barW} height={bh} rx="4"
-              fill="#4a7fc1" />
-            {/* X label */}
-            <text x={x + barW / 2} y={H - 8} textAnchor="middle"
-              fontSize="9" fill="currentColor" fillOpacity="0.5">
-              {fmtLabel(d.date)}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
-// ── Trend badge ──────────────────────────────────────────────────────
-function Trend({ cur, prev }) {
-  if (prev === undefined || prev === null) return null
-  const diff = cur - prev
-  const pct  = prev === 0 ? (cur > 0 ? 100 : 0) : Math.abs(Math.round((diff / prev) * 100))
-  if (diff === 0) return <span className="text-xs text-text-sub">—</span>
-  const up = diff > 0
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
-      up ? 'bg-green-bg text-cgreen' : 'bg-red-bg text-cred'
-    }`}>
-      {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-      {pct}%
-    </span>
-  )
-}
-
-// ── Metric row ───────────────────────────────────────────────────────
-function MetricRow({ label, cur, prev, unit = "so'm", color, divider }) {
-  return (
-    <>
-      {divider && <div className="h-px bg-separator" />}
-      <div className="flex items-center justify-between py-3.5 px-4">
-        <p className="text-sm text-text-sub">{label}</p>
-        <div className="flex items-center gap-2">
-          <Trend cur={cur} prev={prev} />
-          <p className={`text-sm font-bold ${color || 'text-ctext'}`}>
-            {money(cur)} <span className="font-normal text-xs text-text-sub">{unit}</span>
-          </p>
-        </div>
-      </div>
-    </>
-  )
-}
-
-// ── Bar row ──────────────────────────────────────────────────────────
-function BarRow({ name, value, displayVal, max, color = 'bg-primary', emoji }) {
-  const pct = Math.round((value / Math.max(1, max)) * 100)
-  return (
-    <div className="px-4 py-3.5">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          {emoji && <span className="text-base leading-none">{emoji}</span>}
-          <span className="text-sm font-semibold text-ctext">{name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-ctext">{displayVal}</span>
-          <span className="text-xs text-text-sub bg-cbg px-1.5 py-0.5 rounded-md font-medium">{pct}%</span>
-        </div>
-      </div>
-      <div className="h-2 rounded-full bg-cbg overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
-// ── Section label ────────────────────────────────────────────────────
-function SLabel({ icon: Icon, label, iconColor, iconBg, action }) {
-  return (
-    <div className="flex items-center justify-between mb-2 px-1">
-      <div className="flex items-center gap-2">
-        <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${iconBg}`}>
-          <Icon size={13} className={iconColor} />
-        </div>
-        <p className="text-xs font-bold text-text-sub uppercase tracking-wider">{label}</p>
-      </div>
-      {action}
-    </div>
-  )
-}
-
-// ── Partiya stat pill ────────────────────────────────────────────────
-function StatPill({ value, label, color, bg }) {
-  return (
-    <div className={`flex-1 ${bg} rounded-2xl p-4 flex flex-col items-center gap-1 min-w-0`}>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-[11px] font-semibold text-text-sub text-center leading-tight">{label}</p>
-    </div>
-  )
-}
-
 // ── Main ─────────────────────────────────────────────────────────────
 export default function AdminStatistika() {
   const [period, setPeriod]       = useState('oylik')
   const [stats, setStats]         = useState(null)
   const [chartData, setChartData] = useState(null)
+  const [taqqos, setTaqqos]       = useState(null)
   const [loading, setLoading]     = useState(true)
   const [chartLoading, setChartLoading] = useState(true)
   const [error, setError]         = useState('')
@@ -193,7 +32,15 @@ export default function AdminStatistika() {
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    try { setStats(await api.get(`/api/stats/admin?period=${period}`)) }
+    try {
+      // Oylik taqqoslash davrga bog'liq emas — u har doim kalendar oy bo'yicha
+      const [st, tq] = await Promise.all([
+        api.get(`/api/stats/admin?period=${period}`),
+        api.get('/api/stats/oy-taqqos'),
+      ])
+      setStats(st)
+      setTaqqos(tq)
+    }
     catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }, [period])
@@ -245,46 +92,24 @@ export default function AdminStatistika() {
 
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
-      {/* ── Chart ── */}
-      <SLabel icon={BarChart3} label="Daromad grafigi" iconColor="text-primary" iconBg="bg-blue-bg"
+      {/* ── Chart: pul yoki gullar soni ── */}
+      <SLabel icon={BarChart3} label="Savdo grafigi" iconColor="text-primary" iconBg="bg-blue-bg"
         action={
           <span className="text-xs text-text-sub">{chartLabel}</span>
         }
       />
-
-      <div className="bg-ccard border border-cborder rounded-2xl p-4 mb-5">
-        {chartLoading ? (
-          <div className="h-40 flex items-center justify-center">
-            <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : chartData?.data?.length > 0 ? (
-          <>
-            <BarChart data={chartData.data} chartType={chartType} />
-            {/* Legend */}
-            <div className="flex items-center gap-4 mt-2 px-1">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-primary" />
-                <span className="text-xs text-text-sub">
-                  {{ daily:'Bu hafta', weekly:'Bu 4 hafta', monthly:'Bu 3 oy', alltime:'Bu yil' }[chartType]}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-cbg border border-cborder" />
-                <span className="text-xs text-text-sub">
-                  {{ daily:"O'tgan hafta", weekly:"O'tgan 4 hafta", monthly:"O'tgan 3 oy", alltime:"O'tgan yil" }[chartType]}
-                </span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="h-40 flex items-center justify-center">
-            <p className="text-sm text-text-sub">Ma'lumot yo'q</p>
-          </div>
-        )}
-      </div>
+      <SavdoChart
+        data={chartData?.data}
+        chartType={chartType}
+        loading={chartLoading}
+        className="mb-5"
+      />
 
       {loading ? <Spinner /> : (
         <>
+          {/* ── Oylik taqqoslash: bu oy vs o'tgan oy (kalendar oy) ── */}
+          <OyTaqqos data={taqqos} className="mb-5" />
+
           {/* ── Moliya ── */}
           <SLabel icon={TrendingUp} label="Moliya" iconColor="text-cgreen" iconBg="bg-green-bg" />
           <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-5">
