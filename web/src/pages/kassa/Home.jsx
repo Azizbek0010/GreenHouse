@@ -62,18 +62,13 @@ export default function KassaHome() {
             subtitle={`${stats.savdo?.gullar || 0} ta gul sotilgan`}
           />
 
+          {/* "Bugungi tushum" kartochkasi olib tashlandi: u SavdoCard ichidagi
+              "Kassaga tushgan pul" bilan bir xil raqam edi — bitta summa ikki
+              joyda turib, ikkita boshqa raqamdek ko'rinardi */}
           <div className="flex gap-3 mb-6">
             <StatCard
-              label="Bugungi tushum"
-              value={money(stats.daromad)}
-              unit="so'm"
-              icon={<DollarSign size={17} />}
-              bg="bg-green-bg"
-              textColor="text-cgreen"
-            />
-            <StatCard
               label="Sotilgan gullar"
-              value={String(stats.sotildi)}
+              value={String(stats.savdo?.gullar ?? stats.sotildi)}
               unit="ta bugun"
               icon={<Flower2 size={17} />}
               bg="bg-blue-bg"

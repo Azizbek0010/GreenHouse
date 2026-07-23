@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import QarzEditModal from '../../components/QarzEditModal'
 import { sanaLabel, soat, dateKey } from '../../lib/date'
+import { TolovBadge } from '../../components/TolovField'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
@@ -75,7 +76,7 @@ function groupByDate(items, totalKey) {
 
 function DateHeader({ label, right, first }) {
   return (
-    <div className={`flex items-center gap-3 pb-2 ${first ? 'pt-0' : 'pt-5'}`}>
+    <div className={`flex items-center gap-3 pb-2.5 ${first ? 'pt-0' : 'pt-7'}`}>
       <p className="text-xs font-bold text-text-sub uppercase tracking-wider whitespace-nowrap">{label}</p>
       <div className="flex-1 h-px bg-cborder" />
       {right && <p className="text-xs font-semibold text-cgreen whitespace-nowrap">{right}</p>}
@@ -91,21 +92,45 @@ const STATUS_LABEL = { pending: 'Kutilmoqda', approved: 'Tasdiqlandi', rejected:
 // ── Sotuvlar tab ──────────────────────────────────────────────────────
 function SotuvlarTab({ list }) {
   const navigate = useNavigate()
-  const total   = list.reduce((s, x) => s + x.totalPrice, 0)
   const byKassa = [...new Set(list.map(s => s.kassa?.name).filter(Boolean))]
   const [kassaF, setKassaF] = useState('hammasi')
+  const [usulF, setUsulF]   = useState('hammasi')
 
-  const shown = kassaF === 'hammasi' ? list : list.filter(s => s.kassa?.name === kassaF)
+  const shown = list
+    .filter(s => kassaF === 'hammasi' || s.kassa?.name === kassaF)
+    .filter(s => usulF  === 'hammasi' || s.tolov === usulF)
+  const shownTotal = shown.reduce((s, x) => s + x.totalPrice, 0)
 
   return (
     <>
       {/* Total banner */}
       <div className="bg-primary-dk rounded-2xl p-4 flex items-center justify-between mb-4 text-white">
         <div>
-          <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Umumiy tushum</p>
-          <p className="text-xs text-white/50 mt-0.5">{list.length} ta sotuv</p>
+          <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">
+            {usulF === 'hammasi' ? 'Umumiy tushum' : `Tushum · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
+          </p>
+          <p className="text-xs text-white/50 mt-0.5">{shown.length} ta sotuv</p>
         </div>
-        <p className="text-2xl font-bold">{money(total)} <span className="text-sm font-normal text-white/60">so'm</span></p>
+        <p className="text-2xl font-bold">{money(shownTotal)} <span className="text-sm font-normal text-white/60">so'm</span></p>
+      </div>
+
+      {/* To'lov usuli filtri */}
+      <div className="flex gap-1 p-1 mb-3 bg-cbg border border-cborder rounded-xl">
+        {[
+          { key: 'hammasi', label: 'Hammasi', cls: 'text-ctext' },
+          { key: 'naqt',    label: 'Naqt',    cls: 'text-cgreen' },
+          { key: 'karta',   label: 'Karta',   cls: 'text-primary' },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => setUsulF(f.key)}
+            className={`flex-1 h-9 rounded-lg text-sm font-semibold transition-colors ${
+              usulF === f.key ? `bg-ccard shadow-sm ${f.cls}` : 'text-text-sub hover:text-ctext'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Kassa filter */}
@@ -140,6 +165,7 @@ function SotuvlarTab({ list }) {
                             {sv.holat === 'nuqsonli' && (
                               <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-semibold">Nuqsonli</span>
                             )}
+                            <TolovBadge value={sv.tolov} />
                           </div>
                           <p className="text-sm text-text-sub">{sv.qty} ta × {money(sv.pricePerUnit)} so'm · {sv.kassa?.name || 'Kassa'}</p>
                           <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">

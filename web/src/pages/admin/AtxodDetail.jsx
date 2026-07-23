@@ -6,6 +6,7 @@ import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../component
 import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
+import { sanaSoat } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 
@@ -41,6 +42,7 @@ export default function AtxodDetail() {
   const [form, setForm]         = useState(null)
   const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
 
   useEffect(() => {
     api.get(`/api/atxod/${id}`)
@@ -80,6 +82,15 @@ export default function AtxodDetail() {
     finally { setSaving(false) }
   }
 
+  // Tasdiqlash / rad etish — ro'yxatda bor edi, bu sahifada tushib qolgan edi
+  async function review(status) {
+    setReviewing(true); setError('')
+    try {
+      setAx(await api.patch(`/api/atxod/${id}/review`, { status }))
+    } catch (e) { setError(e.message) }
+    finally { setReviewing(false) }
+  }
+
   async function handleDelete() {
     setDeleting(true); setError('')
     try {
@@ -117,7 +128,7 @@ export default function AtxodDetail() {
                   { label: 'Qiymat',  value: `${money(ax.qiymat)} so'm` },
                   { label: "Yo'qotish (jami)", value: `${money(ax.qiymat * ax.qty)} so'm` },
                   { label: 'Sabab',   value: SABAB_LABEL[ax.sabab] || ax.sabab || '—' },
-                  { label: 'Sana',    value: new Date(ax.createdAt).toLocaleString('ru-RU') },
+                  { label: 'Sana',    value: sanaSoat(ax.createdAt) },
                   ...(ax.adminNote ? [{ label: 'Admin izohi', value: ax.adminNote }] : []),
                 ].map(({ label, value }, i) => (
                   <div key={label} className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? 'border-t border-separator' : ''}`}>
@@ -126,6 +137,26 @@ export default function AtxodDetail() {
                   </div>
                 ))}
               </div>
+
+              {/* Kutilayotgan atxod — shu yerdan tasdiqlanadi yoki rad etiladi */}
+              {ax.status === 'pending' && (
+                <div className="flex gap-3 mb-3">
+                  <button
+                    onClick={() => review('approved')}
+                    disabled={reviewing}
+                    className="flex-1 h-12 rounded-xl bg-cgreen text-white text-base font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={18} /> Tasdiqlash
+                  </button>
+                  <button
+                    onClick={() => review('rejected')}
+                    disabled={reviewing}
+                    className="flex-1 h-12 rounded-xl border-[1.5px] border-cred text-cred bg-ccard text-base font-semibold hover:bg-red-bg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    <XCircle size={18} /> Rad etish
+                  </button>
+                </div>
+              )}
 
               {/* Admin: tahrirlash / o'chirish */}
               <div className="space-y-3">

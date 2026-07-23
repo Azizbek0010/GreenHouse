@@ -116,15 +116,10 @@ export default function AdminHome() {
 
       {loading ? <Spinner /> : (
         <>
-          {/* Hero — Daromad */}
-          <div className="bg-primary rounded-2xl p-5 mb-4 text-white">
-            <p className="text-xs font-semibold text-white/60 uppercase tracking-wide mb-1">Daromad</p>
-            <p className="text-4xl font-bold tracking-tight">
-              {money(stats?.daromad)} <span className="text-lg font-medium text-white/70">so'm</span>
-            </p>
-          </div>
-
-          {/* Savdo taqsimoti — tanlangan davr bo'yicha naqt / karta / qarz */}
+          {/* Savdo taqsimoti — tanlangan davr bo'yicha naqt / karta / qarz.
+              Alohida "Daromad" hero olib tashlandi: u aynan
+              tushum.jami bilan bir xil raqam edi va ikki joyda turib,
+              ikkita boshqa-boshqa summa taassurotini berardi. */}
           <SavdoCard
             savdo={stats?.savdo}
             tushum={stats?.tushum}

@@ -18,6 +18,15 @@ function kunKutdi(d) {
 function flowersSummary(flowers = []) {
   return flowers.map(f => `${f.type} ${f.razmer}sm · ${f.qty} ta`).join(', ')
 }
+// Qarz bo'lib-bo'lib to'langan bo'lishi mumkin — usullar har xil bo'lsa
+// hammasi ko'rsatiladi (naqt + karta).
+function qarzUsullari(q) {
+  return [...new Set((q.payments || []).map(p => p.usul).filter(Boolean))]
+}
+// Yozuv qaysi to'lov usuliga tegishli — filtr uchun
+function yozuvUsullari(it) {
+  return it._kind === 'qarz' ? qarzUsullari(it) : (it.tolov ? [it.tolov] : [])
+}
 
 // Qarzlarni ism/telefon bo'yicha qidirish + saralash
 function filterSortQarz(list, search, sort) {
@@ -233,6 +242,7 @@ export default function KassaTarix() {
   const [payQarz, setPayQarz]   = useState(null)
   const [qarzSearch, setQarzSearch] = useState('')
   const [qarzSort, setQarzSort]     = useState('yangi')
+  const [usulF, setUsulF]           = useState('hammasi')
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -261,10 +271,15 @@ export default function KassaTarix() {
   const onPaid = () => { setPayQarz(null); load() }
 
   // Sotuvlar tab: odi sotuvlar + yopilgan qarzlar (tarixga tushgan) — sana bo'yicha
-  const sotuvFeed = [
+  const sotuvFeedAll = [
     ...sotuvlar.map(s => ({ ...s, _kind: 'sotuv', _date: s.createdAt })),
     ...paidQarz.map(q => ({ ...q, _kind: 'qarz', _date: q.paidAt || q.createdAt })),
   ].sort((a, b) => new Date(b._date) - new Date(a._date))
+
+  const sotuvFeed = usulF === 'hammasi'
+    ? sotuvFeedAll
+    : sotuvFeedAll.filter(it => yozuvUsullari(it).includes(usulF))
+  const feedTotal = sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -313,15 +328,40 @@ export default function KassaTarix() {
 
       {loading ? <Spinner /> : tab === 'sotuv' ? (
         <>
+          {/* To'lov usuli bo'yicha filtr — karta va naqd alohida ko'rinishi uchun */}
+          <div className="flex gap-1 p-1 mb-4 bg-cbg border border-cborder rounded-xl">
+            {[
+              { key: 'hammasi', label: 'Hammasi', cls: 'text-ctext' },
+              { key: 'naqt',    label: 'Naqt',    cls: 'text-cgreen' },
+              { key: 'karta',   label: 'Karta',   cls: 'text-primary' },
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setUsulF(f.key)}
+                className={`flex-1 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                  usulF === f.key ? `bg-ccard shadow-sm ${f.cls}` : 'text-text-sub hover:text-ctext'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {sotuvFeed.length > 0 && (
             <div className="bg-green-bg border border-cgreen/20 rounded-2xl p-4 flex items-center justify-between mb-4">
               <div>
-                <p className="text-sm font-semibold text-cgreen">Jami daromad</p>
+                <p className="text-sm font-semibold text-cgreen">
+                  {usulF === 'hammasi' ? 'Jami daromad' : `Jami · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
+                </p>
                 <p className="text-xs text-cgreen/70 mt-0.5">
-                  {sotuvlar.length} ta sotuv{qarzSum.totalPaid > 0 ? ` + qarzdan ${money(qarzSum.totalPaid)}` : ''}
+                  {usulF === 'hammasi'
+                    ? `${sotuvlar.length} ta sotuv${qarzSum.totalPaid > 0 ? ` + qarzdan ${money(qarzSum.totalPaid)}` : ''}`
+                    : `${sotuvFeed.length} ta yozuv`}
                 </p>
               </div>
-              <p className="text-xl font-bold text-cgreen">{money(daromad)} <span className="text-sm font-normal">so'm</span></p>
+              <p className="text-xl font-bold text-cgreen">
+                {money(usulF === 'hammasi' ? daromad : feedTotal)} <span className="text-sm font-normal">so'm</span>
+              </p>
             </div>
           )}
 
@@ -329,7 +369,7 @@ export default function KassaTarix() {
             <div>
               {groupByDate(sotuvFeed, it => it._date).map(group => (
                 <div key={group.label}>
-                  <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">{group.label}</p>
+                  <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-7 pb-2.5 first:pt-0">{group.label}</p>
                   <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden divide-y divide-separator">
                     {group.items.map(it => it._kind === 'sotuv' ? (
                       <div key={it._id} className="p-4">
@@ -358,6 +398,7 @@ export default function KassaTarix() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-bold text-ctext">{it.buyer?.name}</p>
                               <span className="text-xs bg-blue-bg text-primary px-2 py-0.5 rounded-full font-medium">Qarzga olingan</span>
+                              {qarzUsullari(it).map(u => <TolovBadge key={u} value={u} />)}
                             </div>
                             <p className="text-xs text-text-sub mt-1">{flowersSummary(it.flowers)}</p>
                             <p className="text-xs text-text-sub/60 mt-0.5">To'landi: {soat(it.paidAt || it.createdAt)}</p>
@@ -426,7 +467,7 @@ export default function KassaTarix() {
           <div>
             {groupByDate(atxodlar).map(group => (
               <div key={group.label}>
-                <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">
+                <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-7 pb-2.5 first:pt-0">
                   {group.label}
                 </p>
                 <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden divide-y divide-separator">
