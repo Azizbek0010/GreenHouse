@@ -5,7 +5,15 @@ import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import QarzEditModal from '../../components/QarzEditModal'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
-import { sanaLabel, soat, dateKey } from '../../lib/date'
+import { sanaLabel, soat, dateKey, todayLocal } from '../../lib/date'
+
+// Kalendarda nuqta qo'yiladigan kunlar — qaysi kunda yozuv borligi darrov ko'rinsin
+function yozuvKunlari(...royxatlar) {
+  const s = new Set()
+  for (const royxat of royxatlar)
+    for (const it of royxat) s.add(todayLocal(new Date(it.createdAt)))
+  return s
+}
 import { TolovBadge } from '../../components/TolovField'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -620,7 +628,12 @@ export default function AdminTarix() {
       <ErrorMsg msg={error} onClose={() => setError('')} />
 
       {/* Sana bo'yicha qidiruv — barcha tablar uchun */}
-      <SanaFilter f={sanaF} count={shownCount} className="mb-4" />
+      <SanaFilter
+        f={sanaF}
+        count={shownCount}
+        kunlar={yozuvKunlari(sotuvlar, qarzlar, atxodlar, partiyalar)}
+        className="mb-4"
+      />
 
       {loading ? <Spinner /> : (
         <>

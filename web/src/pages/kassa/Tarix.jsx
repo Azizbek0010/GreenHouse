@@ -8,6 +8,14 @@ import TolovField, { TolovBadge } from '../../components/TolovField'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
 import { todayLocal, sanaLabel, soat, groupByDate } from '../../lib/date'
 
+// Kalendarda nuqta qo'yiladigan kunlar — qaysi kunda yozuv borligi darrov ko'rinsin
+function yozuvKunlari(...royxatlar) {
+  const s = new Set()
+  for (const royxat of royxatlar)
+    for (const it of royxat) s.add(todayLocal(new Date(it.createdAt)))
+  return s
+}
+
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function num(s)   { return parseInt(String(s).replace(/\s/g, '')) || 0 }
 function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
@@ -347,6 +355,7 @@ export default function KassaTarix() {
       <SanaFilter
         f={sanaF}
         count={tab === 'sotuv' ? sotuvFeed.length : tab === 'qarz' ? qarzShown.length : atxodShown.length}
+        kunlar={yozuvKunlari(sotuvlar, qarzlar, atxodlar)}
         className="mb-4"
       />
 
