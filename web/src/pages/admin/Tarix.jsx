@@ -98,27 +98,49 @@ const SABAB_LABEL  = { "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Sing
 const STATUS_CLS   = { pending: 'bg-orange-bg text-corange', approved: 'bg-green-bg text-cgreen', rejected: 'bg-red-bg text-cred' }
 const STATUS_LABEL = { pending: 'Kutilmoqda', approved: 'Tasdiqlandi', rejected: 'Rad etildi' }
 
+// Yozuv qaysi to'lov usuliga tegishli — filtr uchun.
+// Qarz to'lanmagan bo'lsa usuli yo'q, shuning uchun naqt/karta filtrida ko'rinmaydi.
+function yozuvUsullari(it) {
+  if (it._kind === 'qarz') return [...new Set((it.payments || []).map(p => p.usul).filter(Boolean))]
+  return it.tolov ? [it.tolov] : []
+}
+
 // ── Sotuvlar tab ──────────────────────────────────────────────────────
-function SotuvlarTab({ list }) {
+// Oddiy sotuvlar + qarzga sotilganlar birga. Qarz ham sotuv: gul o'sha kuni ketgan,
+// shuning uchun sotuv sanasi (createdAt) bo'yicha, "Umumiy savdo" (aylanma) sifatida.
+function SotuvlarTab({ list, qarzlar = [] }) {
   const navigate = useNavigate()
-  const byKassa = [...new Set(list.map(s => s.kassa?.name).filter(Boolean))]
   const [kassaF, setKassaF] = useState('hammasi')
   const [usulF, setUsulF]   = useState('hammasi')
 
-  const shown = list
-    .filter(s => kassaF === 'hammasi' || s.kassa?.name === kassaF)
-    .filter(s => usulF  === 'hammasi' || s.tolov === usulF)
-  const shownTotal = shown.reduce((s, x) => s + x.totalPrice, 0)
+  const feedAll = [
+    ...list.map(s => ({ ...s, _kind: 'sotuv' })),
+    ...qarzlar.map(q => ({ ...q, _kind: 'qarz' })),
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  const byKassa = [...new Set(feedAll.map(x => x.kassa?.name).filter(Boolean))]
+  const shown = feedAll
+    .filter(x => kassaF === 'hammasi' || x.kassa?.name === kassaF)
+    .filter(x => usulF  === 'hammasi' || yozuvUsullari(x).includes(usulF))
+
+  const shownTotal = shown.reduce((s, x) => s + (x.totalPrice || 0), 0)
+  const sotuvSoni  = shown.filter(x => x._kind === 'sotuv').length
+  const qarzSoni   = shown.filter(x => x._kind === 'qarz').length
 
   return (
     <>
-      {/* Total banner */}
+      {/* Umumiy savdo (aylanma) — sotuv + qarz. Qarz to'lanmagan bo'lishi mumkin,
+          shuning uchun bu "kassaga tushgan pul" emas, balki qancha sotilgani */}
       <div className="bg-primary-dk rounded-2xl p-4 flex items-center justify-between mb-4 text-white">
         <div>
           <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-            {usulF === 'hammasi' ? 'Umumiy tushum' : `Tushum · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
+            {usulF === 'hammasi' ? 'Umumiy savdo' : `Savdo · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
           </p>
-          <p className="text-xs text-white/50 mt-0.5">{shown.length} ta sotuv</p>
+          <p className="text-xs text-white/50 mt-0.5">
+            {usulF === 'hammasi'
+              ? `${sotuvSoni} ta sotuv${qarzSoni > 0 ? ` + ${qarzSoni} ta qarz` : ''}`
+              : `${shown.length} ta yozuv`}
+          </p>
         </div>
         <p className="text-2xl font-bold">{money(shownTotal)} <span className="text-sm font-normal text-white/60">so'm</span></p>
       </div>
@@ -163,33 +185,57 @@ function SotuvlarTab({ list }) {
             <div key={group.label}>
               <DateHeader label={group.label} right={`${money(group.total)} so'm`} first={gi === 0} />
               <div className="space-y-3">
-                {group.items.map(sv => (
-                  <button key={sv._id} onClick={() => navigate(`/admin/sotuv/${sv._id}`)}
+                {group.items.map(it => it._kind === 'sotuv' ? (
+                  <button key={it._id} onClick={() => navigate(`/admin/sotuv/${it._id}`)}
                     className="w-full bg-ccard border border-cborder rounded-2xl overflow-hidden text-left hover:border-primary transition-colors">
                     <div className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <p className="text-base font-semibold text-ctext">{sv.flowerType} {sv.razmer}sm</p>
-                            {sv.holat === 'nuqsonli' && (
+                            <p className="text-base font-semibold text-ctext">{it.flowerType} {it.razmer}sm</p>
+                            {it.holat === 'nuqsonli' && (
                               <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-semibold">Nuqsonli</span>
                             )}
-                            <TolovBadge value={sv.tolov} />
+                            <TolovBadge value={it.tolov} />
                           </div>
-                          <p className="text-sm text-text-sub">{sv.qty} ta × {money(sv.pricePerUnit)} so'm · {sv.kassa?.name || 'Kassa'}</p>
+                          <p className="text-sm text-text-sub">{it.qty} ta × {money(it.pricePerUnit)} so'm · {it.kassa?.name || 'Kassa'}</p>
                           <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
-                            {soat(sv.createdAt)} <QoldaBadge show={sv.backfill} />
+                            {soat(it.createdAt)} <QoldaBadge show={it.backfill} />
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className={`text-lg font-bold ${sv.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
-                            {money(sv.totalPrice)}
+                          <p className={`text-lg font-bold ${it.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
+                            {money(it.totalPrice)}
                           </p>
                           <p className="text-xs text-text-sub">so'm</p>
                         </div>
                       </div>
                     </div>
                   </button>
+                ) : (
+                  // Qarzga sotilgan — bu tabda faqat ko'rish (tahrirlash Qarzlar tabida)
+                  <div key={it._id} className="bg-ccard border border-cborder rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-base font-semibold text-ctext">{it.buyer?.name}</p>
+                          <span className="text-xs bg-blue-bg text-primary px-2 py-0.5 rounded-full font-semibold">Qarzga</span>
+                          {it.isPaid
+                            ? <span className="text-xs bg-green-bg text-cgreen px-2 py-0.5 rounded-full font-semibold">To'landi</span>
+                            : <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-semibold">Qarzdor</span>}
+                          {yozuvUsullari(it).map(u => <TolovBadge key={u} value={u} />)}
+                        </div>
+                        <p className="text-sm text-text-sub">{qarzFlowers(it.flowers)} · {it.kassa?.name || 'Kassa'}</p>
+                        <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">
+                          {soat(it.createdAt)} <QoldaBadge show={it.backfill} />
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-lg font-bold ${it.isPaid ? 'text-cgreen' : 'text-corange'}`}>{money(it.totalPrice)}</p>
+                        <p className="text-xs text-text-sub">so'm</p>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -584,12 +630,13 @@ export default function AdminTarix() {
     : qarzSum
 
   const counts = {
-    sotuv:   sotuvShown.length,
+    // Sotuvlar tabida endi qarz ham ko'rinadi — belgidagi son ham shuni aks ettiradi
+    sotuv:   sotuvShown.length + qarzShown.length,
     qarz:    qarzShown.filter(q => !q.isPaid).length,
     atxod:   atxodShown.length,
     partiya: partiyaShown.length,
   }
-  const shownCount = { sotuv: sotuvShown.length, qarz: qarzShown.length, atxod: atxodShown.length, partiya: partiyaShown.length }[tab]
+  const shownCount = { sotuv: sotuvShown.length + qarzShown.length, qarz: qarzShown.length, atxod: atxodShown.length, partiya: partiyaShown.length }[tab]
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -637,7 +684,7 @@ export default function AdminTarix() {
 
       {loading ? <Spinner /> : (
         <>
-          {tab === 'sotuv'   && <SotuvlarTab  list={sotuvShown}   />}
+          {tab === 'sotuv'   && <SotuvlarTab  list={sotuvShown} qarzlar={qarzShown} />}
           {tab === 'qarz'    && <QarzlarTab   list={qarzShown} sum={qarzJami} onChanged={load} />}
           {tab === 'atxod'   && <AtxodlarTab  list={atxodShown}   />}
           {tab === 'partiya' && <PartiyalarTab list={partiyaShown} />}

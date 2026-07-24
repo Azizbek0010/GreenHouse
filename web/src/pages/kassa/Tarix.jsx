@@ -273,24 +273,24 @@ export default function KassaTarix() {
 
   useEffect(() => { load() }, [load])
 
-  const totalSotuv = sotuvlar.reduce((s, x) => s + x.totalPrice, 0)
-  const paidQarz   = qarzlar.filter(q => q.isPaid)
-  // Variant A: daromad = odi sotuvlar + qarzdan haqiqatda tushgan pul (paidAmount)
-  const daromad    = totalSotuv + qarzSum.totalPaid
-
   const onPaid = () => { setPayQarz(null); load() }
 
-  // Sotuvlar tab: odi sotuvlar + yopilgan qarzlar (tarixga tushgan) — sana bo'yicha.
-  // Yopilgan qarz uchun sana — to'langan kun, chunki tarixda u shu kuni ko'rinadi.
+  // Sotuvlar tab: oddiy sotuvlar + BARCHA qarzga sotilganlar (to'langan ham, to'lanmagan ham).
+  // Qarz ham sotuv — gul o'sha kuni ketgan, shuning uchun sotuv sanasi (createdAt) bo'yicha
+  // ko'rsatiladi (avval faqat yopilgan qarz, to'lov kuni bo'yicha chiqardi).
   const sotuvFeedAll = [
     ...sotuvlar.map(s => ({ ...s, _kind: 'sotuv', _date: s.createdAt })),
-    ...paidQarz.map(q => ({ ...q, _kind: 'qarz', _date: q.paidAt || q.createdAt })),
+    ...qarzlar.map(q => ({ ...q, _kind: 'qarz', _date: q.createdAt })),
   ].sort((a, b) => new Date(b._date) - new Date(a._date))
 
   const sotuvFeed = sanaF
     .filter(usulF === 'hammasi' ? sotuvFeedAll : sotuvFeedAll.filter(it => yozuvUsullari(it).includes(usulF)),
             it => it._date)
-  const feedTotal = sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
+  // Umumiy savdo (aylanma) — ko'rinib turgan yozuvlar summasi, qarz ham kiradi.
+  // Bu "kassaga tushgan pul" emas: qarz hali to'lanmagan bo'lishi mumkin.
+  const feedTotal   = sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
+  const feedSotuv   = sotuvFeed.filter(it => it._kind === 'sotuv').length
+  const feedQarz    = sotuvFeed.filter(it => it._kind === 'qarz').length
 
   // Qarz va atxod tablari — yozuv ochilgan sana bo'yicha
   const qarzShown  = sanaF.filter(qarzlar)
@@ -384,17 +384,17 @@ export default function KassaTarix() {
             <div className="bg-green-bg border border-cgreen/20 rounded-2xl p-4 flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm font-semibold text-cgreen">
-                  {usulF === 'hammasi' ? 'Jami daromad' : `Jami · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
+                  {usulF === 'hammasi' ? 'Umumiy savdo' : `Jami · ${usulF === 'naqt' ? 'Naqt' : 'Karta'}`}
                 </p>
                 <p className="text-xs text-cgreen/70 mt-0.5">
-                  {/* Sana yoki usul tanlansa — faqat ko'rinib turgan yozuvlar sanaladi */}
-                  {usulF === 'hammasi' && !sanaF.active
-                    ? `${sotuvlar.length} ta sotuv${qarzSum.totalPaid > 0 ? ` + qarzdan ${money(qarzSum.totalPaid)}` : ''}`
+                  {/* Aylanma: sotuv + qarz. Qarz "kassaga tushgan pul" emas — u to'lanmagan bo'lishi mumkin */}
+                  {usulF === 'hammasi'
+                    ? `${feedSotuv} ta sotuv${feedQarz > 0 ? ` + ${feedQarz} ta qarz` : ''}`
                     : `${sotuvFeed.length} ta yozuv`}
                 </p>
               </div>
               <p className="text-xl font-bold text-cgreen">
-                {money(usulF === 'hammasi' && !sanaF.active ? daromad : feedTotal)} <span className="text-sm font-normal">so'm</span>
+                {money(feedTotal)} <span className="text-sm font-normal">so'm</span>
               </p>
             </div>
           )}
@@ -431,14 +431,18 @@ export default function KassaTarix() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-bold text-ctext">{it.buyer?.name}</p>
-                              <span className="text-xs bg-blue-bg text-primary px-2 py-0.5 rounded-full font-medium">Qarzga olingan</span>
+                              <span className="text-xs bg-blue-bg text-primary px-2 py-0.5 rounded-full font-medium">Qarzga</span>
+                              {it.isPaid
+                                ? <span className="text-xs bg-green-bg text-cgreen px-2 py-0.5 rounded-full font-medium">To'landi</span>
+                                : <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-medium">Qarzdor</span>}
                               {qarzUsullari(it).map(u => <TolovBadge key={u} value={u} />)}
                             </div>
                             <p className="text-xs text-text-sub mt-1">{flowersSummary(it.flowers)}</p>
-                            <p className="text-xs text-text-sub/60 mt-0.5">To'landi: {soat(it.paidAt || it.createdAt)}</p>
+                            <p className="text-xs text-text-sub/60 mt-0.5">{soat(it.createdAt)}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-base font-bold text-cgreen">{money(it.totalPrice)}</p>
+                            {/* To'lanmagan qarz — pul hali kelmagan, shuning uchun to'q sariq */}
+                            <p className={`text-base font-bold ${it.isPaid ? 'text-cgreen' : 'text-corange'}`}>{money(it.totalPrice)}</p>
                             <p className="text-xs text-text-sub">so'm</p>
                           </div>
                         </div>
