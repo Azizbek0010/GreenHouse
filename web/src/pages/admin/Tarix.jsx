@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandCoins, Phone, Search, Pencil } from 'lucide-react'
+import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandCoins, Phone, Search } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
-import QarzEditModal from '../../components/QarzEditModal'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
 import { sanaLabel, soat, dateKey, todayLocal } from '../../lib/date'
 
@@ -213,8 +212,9 @@ function SotuvlarTab({ list, qarzlar = [] }) {
                     </div>
                   </button>
                 ) : (
-                  // Qarzga sotilgan — bu tabda faqat ko'rish (tahrirlash Qarzlar tabida)
-                  <div key={it._id} className="bg-ccard border border-cborder rounded-2xl p-4">
+                  // Qarzga sotilgan — kartaga bosilsa batafsil sahifa
+                  <button key={it._id} onClick={() => navigate(`/admin/qarz/${it._id}`)}
+                    className="w-full text-left bg-ccard border border-cborder rounded-2xl p-4 hover:border-primary transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -235,7 +235,7 @@ function SotuvlarTab({ list, qarzlar = [] }) {
                         <p className="text-xs text-text-sub">so'm</p>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -319,22 +319,25 @@ function qarzFlowers(flowers = []) {
   return flowers.map(f => `${f.type} ${f.razmer}sm · ${f.qty} ta`).join(', ')
 }
 
-function QarzlarTab({ list, sum, onChanged }) {
+function QarzlarTab({ list, sum }) {
+  const navigate = useNavigate()
   const [kassaF, setKassaF] = useState('hammasi')
   const [search, setSearch] = useState('')
   const [sort, setSort]     = useState('yangi')
-  const [editing, setEditing] = useState(null)   // admin tahrirlash uchun tanlangan qarz
   const byKassa = [...new Set(list.map(q => q.kassa?.name).filter(Boolean))]
   const kassaFiltered = kassaF === 'hammasi' ? list : list.filter(q => q.kassa?.name === kassaF)
   const shown = filterSortQarz(kassaFiltered, search, sort)
   const open  = shown.filter(q => !q.isPaid)
   const paid  = shown.filter(q => q.isPaid)
 
+  // Kartaga bosilsa — batafsil sahifa (tahrirlash, o'chirish, to'lovlar tarixi shu yerda).
+  // Telefon havolasi navigatsiyani to'xtatadi.
   const Card = ({ q }) => {
     const remaining = q.totalPrice - q.paidAmount
     const pct = q.totalPrice > 0 ? Math.min(100, Math.round((q.paidAmount / q.totalPrice) * 100)) : 0
     return (
-      <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden">
+      <button onClick={() => navigate(`/admin/qarz/${q._id}`)}
+        className="w-full text-left bg-ccard border border-cborder rounded-2xl overflow-hidden hover:border-primary transition-colors">
         <div className="p-4">
           <div className="flex items-start justify-between gap-3 mb-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -343,19 +346,13 @@ function QarzlarTab({ list, sum, onChanged }) {
                 ? <span className="text-xs bg-green-bg text-cgreen px-2 py-0.5 rounded-full font-semibold">To'landi</span>
                 : <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-semibold">Qarzdor</span>}
             </div>
-            <div className="flex items-start gap-2 shrink-0">
-              <div className="text-right">
-                <p className="text-lg font-bold text-ctext">{money(q.totalPrice)}</p>
-                <p className="text-xs text-text-sub">so'm</p>
-              </div>
-              <button onClick={() => setEditing(q)}
-                className="text-text-sub hover:text-primary p-1.5 hover:bg-cbg rounded-lg transition-colors"
-                title="Tahrirlash">
-                <Pencil size={15} />
-              </button>
+            <div className="text-right shrink-0">
+              <p className="text-lg font-bold text-ctext">{money(q.totalPrice)}</p>
+              <p className="text-xs text-text-sub">so'm</p>
             </div>
           </div>
-          <a href={`tel:${q.buyer?.phone}`} className="text-sm text-primary flex items-center gap-1">
+          <a href={`tel:${q.buyer?.phone}`} onClick={e => e.stopPropagation()}
+            className="text-sm text-primary flex items-center gap-1 w-fit">
             <Phone size={12} /> {q.buyer?.phone}
           </a>
           <p className="text-sm text-text-sub mt-1">{qarzFlowers(q.flowers)}</p>
@@ -379,7 +376,7 @@ function QarzlarTab({ list, sum, onChanged }) {
             </div>
           )}
         </div>
-      </div>
+      </button>
     )
   }
 
@@ -436,14 +433,6 @@ function QarzlarTab({ list, sum, onChanged }) {
           )}
         </div>
       )}
-
-      <QarzEditModal
-        qarz={editing}
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        onSaved={() => onChanged?.()}
-        onDeleted={() => onChanged?.()}
-      />
     </>
   )
 }
@@ -685,7 +674,7 @@ export default function AdminTarix() {
       {loading ? <Spinner /> : (
         <>
           {tab === 'sotuv'   && <SotuvlarTab  list={sotuvShown} qarzlar={qarzShown} />}
-          {tab === 'qarz'    && <QarzlarTab   list={qarzShown} sum={qarzJami} onChanged={load} />}
+          {tab === 'qarz'    && <QarzlarTab   list={qarzShown} sum={qarzJami} />}
           {tab === 'atxod'   && <AtxodlarTab  list={atxodShown}   />}
           {tab === 'partiya' && <PartiyalarTab list={partiyaShown} />}
         </>

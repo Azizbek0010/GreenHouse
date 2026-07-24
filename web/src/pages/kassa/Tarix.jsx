@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Trash2, Lock, HandCoins, User, Phone, Check, Search } from 'lucide-react'
 import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
@@ -183,12 +184,15 @@ function TolovModal({ qarz, onClose, onPaid }) {
 }
 
 // ── Qarz card ──────────────────────────────────────────────────────
+// Kartaga bosilsa — batafsil sahifa (to'lovlar tarixi, gullar). Telefon va
+// "To'lov qilish" tugmasi o'z ishini qiladi (navigatsiyani to'xtatib).
 function QarzCard({ q, onPay }) {
+  const navigate = useNavigate()
   const remaining = q.totalPrice - q.paidAmount
   const pct = q.totalPrice > 0 ? Math.min(100, Math.round((q.paidAmount / q.totalPrice) * 100)) : 0
   return (
-    <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3">
-      <div className="p-4">
+    <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden mb-3 hover:border-primary transition-colors">
+      <div className="p-4 cursor-pointer" onClick={() => navigate(`/kassa/qarz/${q._id}`)}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -199,7 +203,8 @@ function QarzCard({ q, onPay }) {
                 <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-medium">Qarzdor</span>
               )}
             </div>
-            <a href={`tel:${q.buyer?.phone}`} className="text-xs text-primary mt-0.5 flex items-center gap-1">
+            <a href={`tel:${q.buyer?.phone}`} onClick={e => e.stopPropagation()}
+              className="text-xs text-primary mt-0.5 flex items-center gap-1 w-fit">
               <Phone size={11} /> {q.buyer?.phone}
             </a>
             <p className="text-xs text-text-sub mt-1">{flowersSummary(q.flowers)}</p>

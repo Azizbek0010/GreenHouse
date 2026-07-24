@@ -29,6 +29,8 @@ import KassaAtxod      from './pages/kassa/Atxod'
 import KassaTarix      from './pages/kassa/Tarix'
 import KassaStatistika from './pages/kassa/Statistika'
 
+import QarzDetail      from './pages/QarzDetail'
+
 import Profil          from './pages/Profil'
 
 // Guard: faqat autentifikatsiya qilingan foydalanuvchi
@@ -71,6 +73,7 @@ export default function App() {
             <Route path="/admin/sotuv/:id"       element={<PrivateRoute role="admin"><AdminSotuvDetail /></PrivateRoute>} />
             <Route path="/admin/atxod/:id"       element={<PrivateRoute role="admin"><AdminAtxodDetail /></PrivateRoute>} />
             <Route path="/admin/tarix"           element={<PrivateRoute role="admin"><AdminTarix /></PrivateRoute>} />
+            <Route path="/admin/qarz/:id"        element={<PrivateRoute role="admin"><QarzDetail /></PrivateRoute>} />
             <Route path="/admin/users"      element={<PrivateRoute role="admin"><AdminUsers /></PrivateRoute>} />
             <Route path="/admin/sozlamalar" element={<PrivateRoute role="admin"><AdminSozlamalar /></PrivateRoute>} />
 
@@ -86,6 +89,7 @@ export default function App() {
             <Route path="/kassa/qarz"   element={<PrivateRoute role="kassa"><KassaQarzSotuv /></PrivateRoute>} />
             <Route path="/kassa/atxod"  element={<PrivateRoute role="kassa"><KassaAtxod /></PrivateRoute>} />
             <Route path="/kassa/tarix"  element={<PrivateRoute role="kassa"><KassaTarix /></PrivateRoute>} />
+            <Route path="/kassa/qarz/:id" element={<PrivateRoute role="kassa"><QarzDetail /></PrivateRoute>} />
             <Route path="/kassa/statistika" element={<PrivateRoute role="kassa"><KassaStatistika /></PrivateRoute>} />
 
             {/* Profil (barcha rollar) */}

@@ -38,6 +38,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
     setPayments((qarz.payments || []).map(p => ({
       amount: String(p.amount),
       at:     toLocalInput(p.at),
+      usul:   p.usul ?? '',   // naqt / karta / '' (noma'lum). Tahrirlashda yo'qolib ketmasin
     })))
     setError('')
   }, [open, qarz])
@@ -62,7 +63,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
           pricePerUnit:  Number(f.pricePerUnit),
           discountPrice: f.discountPrice === '' ? null : Number(f.discountPrice),
         })),
-        payments: payments.map(p => ({ amount: Number(p.amount), at: new Date(p.at).toISOString() })),
+        payments: payments.map(p => ({ amount: Number(p.amount), at: new Date(p.at).toISOString(), usul: p.usul || null })),
       })
       onSaved(updated)
       onClose()
@@ -147,19 +148,27 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
           <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lovlar</p>
           <div className="space-y-2">
             {payments.map((p, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input type="text" inputMode="numeric" value={p.amount} placeholder="Summa"
-                  onChange={e => setPayment(i, 'amount', e.target.value.replace(/\D/g, ''))} className={`${inputCls} w-32`} />
+              <div key={i} className="bg-cbg border border-cborder rounded-xl p-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input type="text" inputMode="numeric" value={p.amount} placeholder="Summa"
+                    onChange={e => setPayment(i, 'amount', e.target.value.replace(/\D/g, ''))} className={`${inputCls} flex-1`} />
+                  {/* To'lov usuli — bo'sh qoldirilsa "noma'lum" (eski yozuvlar uchun) */}
+                  <select value={p.usul} onChange={e => setPayment(i, 'usul', e.target.value)} className={`${inputCls} w-24`}>
+                    <option value="">—</option>
+                    <option value="naqt">Naqt</option>
+                    <option value="karta">Karta</option>
+                  </select>
+                  <button onClick={() => setPayments(ps => ps.filter((_, idx) => idx !== i))}
+                    className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
                 <input type="datetime-local" value={p.at}
-                  onChange={e => setPayment(i, 'at', e.target.value)} className={`${inputCls} flex-1`} />
-                <button onClick={() => setPayments(ps => ps.filter((_, idx) => idx !== i))}
-                  className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0">
-                  <Trash2 size={15} />
-                </button>
+                  onChange={e => setPayment(i, 'at', e.target.value)} className={inputCls} />
               </div>
             ))}
             <button
-              onClick={() => setPayments(ps => [...ps, { amount: '', at: toLocalInput(new Date()) }])}
+              onClick={() => setPayments(ps => [...ps, { amount: '', at: toLocalInput(new Date()), usul: 'naqt' }])}
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
             >
               <Plus size={15} /> To'lov qo'shish
