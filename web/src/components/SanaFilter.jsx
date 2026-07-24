@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { CalendarDays, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
-import { todayLocal, formatSanaUz, UZ_MONTHS, MIN_SANA } from '../lib/date'
+import { CalendarDays, Check } from 'lucide-react'
+import { todayLocal, formatSanaUz } from '../lib/date'
+import Kalendar from './Kalendar'
 
 // Sana bo'yicha qidiruv.
 //
@@ -8,25 +9,8 @@ import { todayLocal, formatSanaUz, UZ_MONTHS, MIN_SANA } from '../lib/date'
 // chiqdi: har bir maydon operatsion tizimning alohida kalendarini ochardi,
 // oraliq tanlash uchun 6 ta harakat kerak bo'lardi, sana esa 18.07.2026 ko'rinishida
 // chiqib, ilovaning qolgan qismidagi "18-iyul" bilan mos kelmasdi.
-// "Faqat shu kun" degan tugma ham faqat shu noqulaylikni yamash uchun turardi.
-//
-// Endi bitta kalendar: birinchi bosish — boshlanish, ikkinchisi — tugash.
-// Bitta kun kerak bo'lsa — bir xil kunni ikki marta bosiladi, alohida tugma shart emas.
-// Yozuv bo'lgan kunlar tagida nuqta turadi — kassa qaysi kunlarda savdo bo'lganini
-// darrov ko'radi (buning uchun sahifadan `kunlar` proplari uzatiladi).
-
-const HAFTA = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya']
-
-const kalit = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-
-// Oy katakchalari, dushanbadan boshlab. Bo'sh kataklar — null.
-function oyKataklari(yil, oy) {
-  const bosh   = (new Date(yil, oy, 1).getDay() + 6) % 7
-  const kunlar = new Date(yil, oy + 1, 0).getDate()
-  const katak  = Array(bosh).fill(null)
-  for (let d = 1; d <= kunlar; d++) katak.push(d)
-  return katak
-}
+// Endi bitta ichki `Kalendar` (mode="range"): bir bosish — boshlanish, ikkinchisi — tugash.
+// Yozuv bo'lgan kunlar tagida nuqta (kunlar propi).
 
 const bugun    = () => todayLocal()
 const kunOldin = n => { const d = new Date(); d.setDate(d.getDate() - n); return todayLocal(d) }
@@ -73,106 +57,6 @@ export function useSanaFilter() {
 
   return { preset, from, to, active, label, filter, tanla, oraliqQoy,
            tozala: () => tanla('hammasi') }
-}
-
-// ── Kalendar ────────────────────────────────────────────────────────
-function Kalendar({ f, kunlar, onYopish }) {
-  const bugungi = todayLocal()
-  const boshlash = f.from ? new Date(`${f.from}T00:00:00`) : new Date()
-  const [kor, setKor]     = useState({ yil: boshlash.getFullYear(), oy: boshlash.getMonth() })
-  // 'bosh' — keyingi bosish boshlanish sanasi, 'oxir' — tugash sanasi
-  const [rejim, setRejim] = useState('bosh')
-
-  const kataklar = oyKataklari(kor.yil, kor.oy)
-  const surish = n => {
-    const d = new Date(kor.yil, kor.oy + n, 1)
-    setKor({ yil: d.getFullYear(), oy: d.getMonth() })
-  }
-  // Kelajakdagi oyga va MIN_SANA dan oldingi oyga o'tish yopiq
-  const keyingiBor = kalit(kor.yil, kor.oy, 1) < bugungi.slice(0, 7) + '-01'
-  const oldingiBor = kalit(kor.yil, kor.oy, 1) > MIN_SANA
-
-  const bosildi = s => {
-    if (rejim === 'bosh')      { f.oraliqQoy(s, s); setRejim('oxir') }
-    else if (s >= f.from)      { f.oraliqQoy(f.from, s); setRejim('bosh') }
-    else                       { f.oraliqQoy(s, f.to); setRejim('bosh') }
-  }
-
-  return (
-    <div>
-      {/* Oy boshqaruvi */}
-      <div className="flex items-center gap-1 mb-1">
-        <button
-          onClick={() => surish(-1)}
-          disabled={!oldingiBor}
-          aria-label="Oldingi oy"
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-text-sub hover:text-ctext hover:bg-cbg transition-colors disabled:opacity-25"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <p className="flex-1 text-center text-sm font-bold text-ctext">
-          {UZ_MONTHS[kor.oy].replace(/^./, c => c.toUpperCase())} {kor.yil}
-        </p>
-        <button
-          onClick={() => surish(1)}
-          disabled={!keyingiBor}
-          aria-label="Keyingi oy"
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-text-sub hover:text-ctext hover:bg-cbg transition-colors disabled:opacity-25"
-        >
-          <ChevronRight size={18} />
-        </button>
-        <button
-          onClick={onYopish}
-          aria-label="Yopish"
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-text-sub hover:text-ctext hover:bg-cbg transition-colors"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      {/* Nima qilish kerakligi — o'ylab o'tirmaslik uchun */}
-      <p className="text-[11px] font-semibold text-primary text-center mb-1.5">
-        {rejim === 'bosh' ? 'Boshlanish kunini tanlang' : 'Tugash kunini tanlang'}
-      </p>
-
-      <div className="grid grid-cols-7 mb-0.5">
-        {HAFTA.map(h => (
-          <span key={h} className="text-center text-[11px] font-semibold text-text-sub py-1">{h}</span>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7">
-        {kataklar.map((d, i) => {
-          if (!d) return <span key={i} />
-          const s        = kalit(kor.yil, kor.oy, d)
-          const yopiq    = s > bugungi || s < MIN_SANA
-          const ichida   = f.from && f.to && s >= f.from && s <= f.to
-          const chekka   = s === f.from || s === f.to
-          const yozuvBor = kunlar?.has(s)
-
-          return (
-            <button
-              key={i}
-              onClick={() => bosildi(s)}
-              disabled={yopiq}
-              className={`relative h-11 text-sm font-medium transition-colors disabled:opacity-25 disabled:cursor-not-allowed
-                ${ichida && !chekka ? 'bg-blue-bg text-ctext' : ''}
-                ${chekka ? 'bg-primary text-white font-bold rounded-xl' : ''}
-                ${!ichida && !chekka ? 'text-ctext hover:bg-cbg rounded-xl' : ''}
-                ${s === bugungi && !chekka ? 'ring-1 ring-inset ring-primary/40 rounded-xl' : ''}`}
-            >
-              {d}
-              {yozuvBor && (
-                <span className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
-                  chekka ? 'bg-white/70' : 'bg-cgreen'
-                }`} />
-              )}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 export default function SanaFilter({ f, count, kunlar, className = '' }) {
@@ -227,7 +111,8 @@ export default function SanaFilter({ f, count, kunlar, className = '' }) {
 
       {open && (
         <div className="mt-2 bg-ccard border border-cborder rounded-2xl p-3">
-          <Kalendar f={f} kunlar={kunlar} onYopish={() => setOpen(false)} />
+          <Kalendar mode="range" from={f.from} to={f.to}
+            onRange={(a, b) => f.oraliqQoy(a, b)} kunlar={kunlar} onYopish={() => setOpen(false)} />
 
           <div className="flex items-center gap-2 mt-2 pt-2.5 border-t border-separator">
             <p className="flex-1 min-w-0 text-sm font-semibold text-ctext truncate">

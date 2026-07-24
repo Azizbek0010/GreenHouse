@@ -6,9 +6,12 @@ import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../component
 import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
-import { todayLocal, MIN_SANA } from '../../lib/date'
+import SanaTanla from '../../components/SanaTanla'
+import { todayLocal } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
+function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
+const raqam = s => s.replace(/[\s\D]/g, '')
 
 export default function SotuvDetail() {
   const { id } = useParams()
@@ -147,17 +150,16 @@ export default function SotuvDetail() {
               </select>
             </Field>
             <Field label="Sotuv sanasi">
-              <input type="date" value={form.sana} min={MIN_SANA} max={todayLocal()}
-                onChange={set('sana')} className={inputCls} />
+              <SanaTanla value={form.sana} onChange={v => setForm(f => ({ ...f, sana: v }))} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Narx (1 ta, so'm)">
-                <input type="text" inputMode="numeric" value={form.pricePerUnit}
-                  onChange={e => setForm(f => ({ ...f, pricePerUnit: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+                <input type="text" inputMode="numeric" value={fmtInput(form.pricePerUnit)}
+                  onChange={e => setForm(f => ({ ...f, pricePerUnit: raqam(e.target.value) }))} className={inputCls} />
               </Field>
               <Field label="Chegirma bilan (ixtiyoriy)">
-                <input type="text" inputMode="numeric" value={form.discountPrice} placeholder="Bo'sh = chegirmasiz"
-                  onChange={e => setForm(f => ({ ...f, discountPrice: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+                <input type="text" inputMode="numeric" value={fmtInput(form.discountPrice)} placeholder="Bo'sh = chegirmasiz"
+                  onChange={e => setForm(f => ({ ...f, discountPrice: raqam(e.target.value) }))} className={inputCls} />
               </Field>
             </div>
             <p className="text-xs text-text-sub">

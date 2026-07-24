@@ -1,4 +1,4 @@
-// Admin: qarzni tahrirlash — xaridor, gullar, to'lovlar
+// Admin: qarzni tahrirlash — xaridor, sana, gullar, to'lovlar
 import { useState, useEffect } from 'react'
 import { Trash2, Plus } from 'lucide-react'
 import { api } from '../lib/api'
@@ -6,21 +6,21 @@ import BottomModal from './BottomModal'
 import FlowerTypeSelect from './FlowerTypeSelect'
 import { PrimaryButton, ErrorMsg } from './ui'
 import { DeleteButton, Field, inputCls } from './AdminEdit'
-import { todayLocal, MIN_SANA } from '../lib/date'
+import SanaTanla from './SanaTanla'
+import { todayLocal } from '../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
-
-function toLocalInput(d) {
-  const dt = new Date(d)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-}
+// Katta summalar o'qilishi uchun mingliklarga bo'sh joy: "70000" -> "70 000"
+function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
+const raqam = s => s.replace(/[\s\D]/g, '')
+// Kun bo'yicha sana -> Toshkent peshini (12:00) ISO. Kun muhim, soat emas.
+const kunToISO = d => new Date(`${d}T07:00:00.000Z`).toISOString()
 
 export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted }) {
   const [buyerName, setBuyerName]   = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
   const [sana, setSana]             = useState('')     // sotuv sanasi (createdAt)
-  const [origSana, setOrigSana]     = useState('')     // o'zgarganini bilish uchun
+  const [origSana, setOrigSana]     = useState('')
   const [flowers, setFlowers]       = useState([])
   const [payments, setPayments]     = useState([])
   const [saving, setSaving]         = useState(false)
@@ -42,8 +42,8 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
     })))
     setPayments((qarz.payments || []).map(p => ({
       amount: String(p.amount),
-      at:     toLocalInput(p.at),
-      usul:   p.usul ?? '',   // naqt / karta / '' (noma'lum). Tahrirlashda yo'qolib ketmasin
+      at:     todayLocal(new Date(p.at)),   // kun bo'yicha (ichki kalendar)
+      usul:   p.usul ?? '',                 // naqt / karta / '' (noma'lum)
     })))
     setError('')
   }, [open, qarz])
@@ -61,8 +61,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
       const updated = await api.patch(`/api/qarz/${qarz._id}`, {
         buyerName,
         buyerPhone,
-        // Sana faqat o'zgargan bo'lsa yuboriladi — aks holda vaqt bejiz siljib ketmaydi
-        ...(sana !== origSana ? { sana } : {}),
+        ...(sana !== origSana ? { sana } : {}),   // faqat o'zgargan bo'lsa
         flowers: flowers.map(f => ({
           type:          f.type,
           razmer:        Number(f.razmer),
@@ -70,7 +69,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
           pricePerUnit:  Number(f.pricePerUnit),
           discountPrice: f.discountPrice === '' ? null : Number(f.discountPrice),
         })),
-        payments: payments.map(p => ({ amount: Number(p.amount), at: new Date(p.at).toISOString(), usul: p.usul || null })),
+        payments: payments.map(p => ({ amount: Number(p.amount), at: kunToISO(p.at), usul: p.usul || null })),
       })
       onSaved(updated)
       onClose()
@@ -103,10 +102,9 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
           </Field>
         </div>
 
-        {/* Sotuv sanasi — admin xato sanani tuzatishi uchun */}
+        {/* Sotuv sanasi — ichki kalendar */}
         <Field label="Sotuv sanasi">
-          <input type="date" value={sana} min={MIN_SANA} max={todayLocal()}
-            onChange={e => setSana(e.target.value)} className={inputCls} />
+          <SanaTanla value={sana} onChange={setSana} />
         </Field>
 
         {/* Gullar */}
@@ -120,7 +118,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
                     <FlowerTypeSelect boxed value={f.type} onChange={v => setFlower(i, 'type', v)} />
                   </div>
                   <button onClick={() => setFlowers(fs => fs.filter((_, idx) => idx !== i))}
-                    className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0">
+                    className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0" aria-label="Gulni o'chirish">
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -136,12 +134,12 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Narx (1 ta)">
-                    <input type="text" inputMode="numeric" value={f.pricePerUnit}
-                      onChange={e => setFlower(i, 'pricePerUnit', e.target.value.replace(/\D/g, ''))} className={inputCls} />
+                    <input type="text" inputMode="numeric" value={fmtInput(f.pricePerUnit)}
+                      onChange={e => setFlower(i, 'pricePerUnit', raqam(e.target.value))} className={inputCls} />
                   </Field>
                   <Field label="Chegirma bilan (ixt.)">
-                    <input type="text" inputMode="numeric" value={f.discountPrice} placeholder="Bo'sh = yo'q"
-                      onChange={e => setFlower(i, 'discountPrice', e.target.value.replace(/\D/g, ''))} className={inputCls} />
+                    <input type="text" inputMode="numeric" value={fmtInput(f.discountPrice)} placeholder="Bo'sh = yo'q"
+                      onChange={e => setFlower(i, 'discountPrice', raqam(e.target.value))} className={inputCls} />
                   </Field>
                 </div>
                 <p className="text-xs text-text-sub">Jami: <span className="font-semibold text-ctext">{money(flowerTotal(f))} so'm</span></p>
@@ -149,7 +147,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
             ))}
             <button
               onClick={() => setFlowers(fs => [...fs, { type: '', razmer: '', qty: '', pricePerUnit: '', discountPrice: '' }])}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
             >
               <Plus size={15} /> Gul qo'shish
             </button>
@@ -159,30 +157,33 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
         {/* To'lovlar */}
         <div>
           <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lovlar</p>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {payments.map((p, i) => (
-              <div key={i} className="bg-cbg border border-cborder rounded-xl p-2.5 space-y-2">
+              <div key={i} className="bg-cbg border border-cborder rounded-2xl p-3 space-y-2">
+                {/* inputCls da w-full bor — flex bolalar o'rovchi div bilan boshqariladi */}
                 <div className="flex items-center gap-2">
-                  <input type="text" inputMode="numeric" value={p.amount} placeholder="Summa"
-                    onChange={e => setPayment(i, 'amount', e.target.value.replace(/\D/g, ''))} className={`${inputCls} flex-1`} />
-                  {/* To'lov usuli — bo'sh qoldirilsa "noma'lum" (eski yozuvlar uchun) */}
-                  <select value={p.usul} onChange={e => setPayment(i, 'usul', e.target.value)} className={`${inputCls} w-24`}>
-                    <option value="">—</option>
-                    <option value="naqt">Naqt</option>
-                    <option value="karta">Karta</option>
-                  </select>
+                  <div className="flex-1 min-w-0">
+                    <input type="text" inputMode="numeric" value={fmtInput(p.amount)} placeholder="Summa"
+                      onChange={e => setPayment(i, 'amount', raqam(e.target.value))} className={inputCls} />
+                  </div>
+                  <div className="w-24 shrink-0">
+                    <select value={p.usul} onChange={e => setPayment(i, 'usul', e.target.value)} className={inputCls}>
+                      <option value="">—</option>
+                      <option value="naqt">Naqt</option>
+                      <option value="karta">Karta</option>
+                    </select>
+                  </div>
                   <button onClick={() => setPayments(ps => ps.filter((_, idx) => idx !== i))}
-                    className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0">
+                    className="text-cred p-2 hover:bg-red-bg rounded-lg shrink-0" aria-label="To'lovni o'chirish">
                     <Trash2 size={15} />
                   </button>
                 </div>
-                <input type="datetime-local" value={p.at}
-                  onChange={e => setPayment(i, 'at', e.target.value)} className={inputCls} />
+                <SanaTanla value={p.at} onChange={v => setPayment(i, 'at', v)} min={sana} />
               </div>
             ))}
             <button
-              onClick={() => setPayments(ps => [...ps, { amount: '', at: toLocalInput(new Date()), usul: 'naqt' }])}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
+              onClick={() => setPayments(ps => [...ps, { amount: '', at: todayLocal(new Date()), usul: 'naqt' }])}
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
             >
               <Plus size={15} /> To'lov qo'shish
             </button>
@@ -199,7 +200,11 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
         )}
 
         <PrimaryButton title="Saqlash" onClick={handleSave} loading={saving} disabled={totalPaid > totalPrice} />
-        <DeleteButton onConfirm={handleDelete} loading={deleting} label="Qarzni o'chirish" />
+
+        {/* O'chirish — asosiy amaldan ajratilgan (tasodifan bosilmasin) */}
+        <div className="pt-3 mt-1 border-t border-separator">
+          <DeleteButton onConfirm={handleDelete} loading={deleting} label="Qarzni o'chirish" />
+        </div>
       </div>
     </BottomModal>
   )

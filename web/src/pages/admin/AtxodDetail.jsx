@@ -6,9 +6,12 @@ import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../component
 import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
-import { sanaSoat, todayLocal, MIN_SANA } from '../../lib/date'
+import SanaTanla from '../../components/SanaTanla'
+import { sanaSoat, todayLocal } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
+function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
+const raqam = s => s.replace(/[\s\D]/g, '')
 
 const SABABLAR = ["so'lgan", 'nuqsonli', 'singan', 'boshqa']
 const SABAB_LABEL = { "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Singan', boshqa: 'Boshqa' }
@@ -195,8 +198,8 @@ export default function AtxodDetail() {
                 </select>
               </Field>
               <Field label="Qiymat (1 ta, so'm)">
-                <input type="text" inputMode="numeric" value={form.qiymat}
-                  onChange={e => setForm(f => ({ ...f, qiymat: e.target.value.replace(/\D/g, '') }))} className={inputCls} />
+                <input type="text" inputMode="numeric" value={fmtInput(form.qiymat)}
+                  onChange={e => setForm(f => ({ ...f, qiymat: raqam(e.target.value) }))} className={inputCls} />
               </Field>
             </div>
             <Field label="Status">
@@ -207,8 +210,7 @@ export default function AtxodDetail() {
               </select>
             </Field>
             <Field label="Sana">
-              <input type="date" value={form.sana} min={MIN_SANA} max={todayLocal()}
-                onChange={set('sana')} className={inputCls} />
+              <SanaTanla value={form.sana} onChange={v => setForm(f => ({ ...f, sana: v }))} />
             </Field>
             <Field label="Admin izohi (ixtiyoriy)">
               <input value={form.adminNote} onChange={set('adminNote')} className={inputCls} />
