@@ -1,5 +1,5 @@
 const Atxod = require('../models/Atxod')
-const { resolveSana, sanaFields } = require('../utils/sana')
+const { resolveSana, sanaFields, resolveSanaForEdit, forceCreatedAt } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
   try {
@@ -106,7 +106,12 @@ exports.adminUpdate = async (req, res, next) => {
     }
     if (adminNote !== undefined) atxod.adminNote = adminNote || null
 
+    // Sana (createdAt) — immutable, save dan keyin majburlanadi
+    const sanaEdit = resolveSanaForEdit(req.body.sana)
+    if (sanaEdit.error) return res.status(400).json({ message: sanaEdit.error })
+
     await atxod.save()
+    if (!sanaEdit.skip) await forceCreatedAt(Atxod, atxod, sanaEdit)
     await atxod.populate('kassa', 'name')
     res.json(atxod)
   } catch (err) {

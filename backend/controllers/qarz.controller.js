@@ -1,5 +1,5 @@
 const Qarz = require('../models/Qarz')
-const { resolveSana, sanaFields } = require('../utils/sana')
+const { resolveSana, sanaFields, resolveSanaForEdit, forceCreatedAt } = require('../utils/sana')
 
 function parseFlowers(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null
@@ -123,6 +123,11 @@ exports.adminUpdate = async (req, res, next) => {
       qarz.totalPrice = flowers.reduce((s, f) => s + flowerTotal(f), 0)
     }
 
+    // Sotuv sanasi (createdAt) — admin xato sana qo'ygan bo'lsa tuzatadi.
+    // Faqat validatsiya; createdAt immutable, save dan keyin majburlanadi (pastda).
+    const sanaEdit = resolveSanaForEdit(req.body.sana)
+    if (sanaEdit.error) return res.status(400).json({ message: sanaEdit.error })
+
     if (req.body.buyerName !== undefined) {
       const name = (req.body.buyerName || '').trim()
       if (!name) return res.status(400).json({ message: 'Sotib oluvchi ismi shart' })
@@ -161,6 +166,7 @@ exports.adminUpdate = async (req, res, next) => {
     qarz.paidAt = qarz.isPaid ? (qarz.payments[qarz.payments.length - 1]?.at ?? new Date()) : null
 
     await qarz.save()
+    if (!sanaEdit.skip) await forceCreatedAt(Qarz, qarz, sanaEdit)
     await qarz.populate('kassa', 'name')
     res.json(qarz)
   } catch (err) {

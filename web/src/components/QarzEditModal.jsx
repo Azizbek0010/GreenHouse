@@ -6,6 +6,7 @@ import BottomModal from './BottomModal'
 import FlowerTypeSelect from './FlowerTypeSelect'
 import { PrimaryButton, ErrorMsg } from './ui'
 import { DeleteButton, Field, inputCls } from './AdminEdit'
+import { todayLocal, MIN_SANA } from '../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 
@@ -18,6 +19,8 @@ function toLocalInput(d) {
 export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted }) {
   const [buyerName, setBuyerName]   = useState('')
   const [buyerPhone, setBuyerPhone] = useState('')
+  const [sana, setSana]             = useState('')     // sotuv sanasi (createdAt)
+  const [origSana, setOrigSana]     = useState('')     // o'zgarganini bilish uchun
   const [flowers, setFlowers]       = useState([])
   const [payments, setPayments]     = useState([])
   const [saving, setSaving]         = useState(false)
@@ -28,6 +31,8 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
     if (!open || !qarz) return
     setBuyerName(qarz.buyer?.name || '')
     setBuyerPhone(qarz.buyer?.phone || '')
+    const d = todayLocal(new Date(qarz.createdAt))
+    setSana(d); setOrigSana(d)
     setFlowers((qarz.flowers || []).map(f => ({
       type:          f.type,
       razmer:        String(f.razmer),
@@ -56,6 +61,8 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
       const updated = await api.patch(`/api/qarz/${qarz._id}`, {
         buyerName,
         buyerPhone,
+        // Sana faqat o'zgargan bo'lsa yuboriladi — aks holda vaqt bejiz siljib ketmaydi
+        ...(sana !== origSana ? { sana } : {}),
         flowers: flowers.map(f => ({
           type:          f.type,
           razmer:        Number(f.razmer),
@@ -95,6 +102,12 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
             <input value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} className={inputCls} />
           </Field>
         </div>
+
+        {/* Sotuv sanasi — admin xato sanani tuzatishi uchun */}
+        <Field label="Sotuv sanasi">
+          <input type="date" value={sana} min={MIN_SANA} max={todayLocal()}
+            onChange={e => setSana(e.target.value)} className={inputCls} />
+        </Field>
 
         {/* Gullar */}
         <div>

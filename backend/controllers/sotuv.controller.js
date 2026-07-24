@@ -1,5 +1,5 @@
 const Sotuv = require('../models/Sotuv')
-const { resolveSana, sanaFields } = require('../utils/sana')
+const { resolveSana, sanaFields, resolveSanaForEdit, forceCreatedAt } = require('../utils/sana')
 
 exports.create = async (req, res, next) => {
   try {
@@ -134,7 +134,12 @@ exports.adminUpdate = async (req, res, next) => {
     if (sotuv.discountPrice != null && sotuv.discountPrice > sotuv.pricePerUnit * sotuv.qty)
       return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
 
+    // Sotuv sanasi (createdAt) — immutable, save dan keyin majburlanadi
+    const sanaEdit = resolveSanaForEdit(req.body.sana)
+    if (sanaEdit.error) return res.status(400).json({ message: sanaEdit.error })
+
     await sotuv.save()
+    if (!sanaEdit.skip) await forceCreatedAt(Sotuv, sotuv, sanaEdit)
     await sotuv.populate('kassa', 'name')
     res.json(sotuv)
   } catch (err) {

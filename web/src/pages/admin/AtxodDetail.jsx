@@ -6,7 +6,7 @@ import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../component
 import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
-import { sanaSoat } from '../../lib/date'
+import { sanaSoat, todayLocal, MIN_SANA } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 
@@ -52,6 +52,7 @@ export default function AtxodDetail() {
   }, [id])
 
   function openEdit() {
+    const d = todayLocal(new Date(ax.createdAt))
     setForm({
       flowerType: ax.flowerType,
       razmer:     String(ax.razmer),
@@ -60,6 +61,8 @@ export default function AtxodDetail() {
       qiymat:     String(ax.qiymat),
       status:     ax.status,
       adminNote:  ax.adminNote || '',
+      sana:       d,
+      origSana:   d,
     })
     setEditOpen(true)
   }
@@ -75,6 +78,7 @@ export default function AtxodDetail() {
         qiymat:     Number(form.qiymat),
         status:     form.status,
         adminNote:  form.adminNote.trim() || null,
+        ...(form.sana !== form.origSana ? { sana: form.sana } : {}),
       })
       setAx(updated)
       setEditOpen(false)
@@ -201,6 +205,10 @@ export default function AtxodDetail() {
                 <option value="approved">Tasdiqlandi</option>
                 <option value="rejected">Rad etildi</option>
               </select>
+            </Field>
+            <Field label="Sana">
+              <input type="date" value={form.sana} min={MIN_SANA} max={todayLocal()}
+                onChange={set('sana')} className={inputCls} />
             </Field>
             <Field label="Admin izohi (ixtiyoriy)">
               <input value={form.adminNote} onChange={set('adminNote')} className={inputCls} />

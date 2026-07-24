@@ -6,6 +6,7 @@ import { Spinner, ErrorMsg, PrimaryButton, OutlineButton } from '../../component
 import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
+import { todayLocal, MIN_SANA } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 
@@ -30,6 +31,7 @@ export default function SotuvDetail() {
   }, [id])
 
   function openEdit() {
+    const d = todayLocal(new Date(sv.createdAt))
     setForm({
       flowerType:    sv.flowerType,
       razmer:        String(sv.razmer),
@@ -37,6 +39,8 @@ export default function SotuvDetail() {
       holat:         sv.holat,
       pricePerUnit:  String(sv.pricePerUnit),
       discountPrice: sv.discountPrice != null ? String(sv.discountPrice) : '',
+      sana:          d,
+      origSana:      d,
     })
     setEditOpen(true)
   }
@@ -51,6 +55,8 @@ export default function SotuvDetail() {
         holat:         form.holat,
         pricePerUnit:  Number(form.pricePerUnit),
         discountPrice: form.discountPrice === '' ? null : Number(form.discountPrice),
+        // Sana faqat o'zgargan bo'lsa
+        ...(form.sana !== form.origSana ? { sana: form.sana } : {}),
       })
       setSv(updated)
       setEditOpen(false)
@@ -139,6 +145,10 @@ export default function SotuvDetail() {
                 <option value="yaxshi">Yaxshi</option>
                 <option value="nuqsonli">Nuqsonli</option>
               </select>
+            </Field>
+            <Field label="Sotuv sanasi">
+              <input type="date" value={form.sana} min={MIN_SANA} max={todayLocal()}
+                onChange={set('sana')} className={inputCls} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Narx (1 ta, so'm)">

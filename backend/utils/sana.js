@@ -47,4 +47,27 @@ function sanaFields(s) {
   return { createdAt: s.createdAt, backfill: true, enteredAt: new Date() }
 }
 
-module.exports = { resolveSana, sanaFields, todayTashkent, MIN_SANA }
+// adminUpdate uchun: yozuvning sanasini (createdAt) tuzatish.
+// resolveSanaForEdit — sana kelmasa {skip}, xato bo'lsa {error}, aks holda {createdAt, backfill}.
+function resolveSanaForEdit(sana) {
+  if (sana === undefined || sana === '') return { skip: true }
+  const s = resolveSana(sana)
+  if (s.error) return { error: s.error }
+  // Bugun tanlansa createdAt = hozir; o'tgan kun — peshin (resolveSana bergan)
+  return { createdAt: s.createdAt || new Date(), backfill: !!s.createdAt }
+}
+
+// createdAt Mongoose da immutable (timestamps: true) — na doc.save(), na doc.createdAt=...
+// ishlamaydi (ikkovi ham jimgina e'tiborsiz qoldiriladi). Shuning uchun:
+//   1) bazada to'g'ridan-to'g'ri drayver orqali yangilaymiz (immutable ni chetlab o'tadi)
+//   2) javob uchun doc._doc ga yozamiz — bu ham immutable setterni chetlab o'tadi
+async function forceCreatedAt(Model, doc, r) {
+  await Model.collection.updateOne(
+    { _id: doc._id },
+    { $set: { createdAt: r.createdAt, backfill: r.backfill } }
+  )
+  doc._doc.createdAt = r.createdAt
+  doc._doc.backfill  = r.backfill
+}
+
+module.exports = { resolveSana, sanaFields, todayTashkent, MIN_SANA, resolveSanaForEdit, forceCreatedAt }
