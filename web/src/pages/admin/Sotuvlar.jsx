@@ -62,9 +62,9 @@ export default function AdminSotuvlar() {
         <EmptyState text="Hozircha sotuv yo'q" />
       ) : (
         <div>
-          {groupByDate(sotuvlar).map(group => (
+          {groupByDate(sotuvlar).map((group, gi) => (
             <div key={group.label}>
-              <div className="flex items-center justify-between px-1 pt-4 pb-2 first:pt-0">
+              <div className={`flex items-center justify-between px-1 pb-2 ${gi === 0 ? 'pt-1' : 'pt-6'}`}>
                 <p className="text-xs font-bold text-text-sub uppercase tracking-wider">{group.label}</p>
                 <p className="text-xs font-semibold text-cgreen">{money(group.total)} s</p>
               </div>

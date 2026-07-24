@@ -81,9 +81,9 @@ export default function AdminPartiyalar() {
         <EmptyState text="Partiya yo'q" />
       ) : (
         <div>
-          {groupByDate(shown).map(group => (
+          {groupByDate(shown).map((group, gi) => (
             <div key={group.label}>
-              <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">
+              <p className={`text-xs font-bold text-text-sub uppercase tracking-wider px-1 pb-2 ${gi === 0 ? 'pt-1' : 'pt-6'}`}>
                 {group.label}
               </p>
               <div className="bg-ccard rounded-2xl border border-cborder overflow-hidden">

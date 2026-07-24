@@ -96,9 +96,9 @@ export default function AdminAtxod() {
         <EmptyState text="Bu bo'limda atxod yo'q" />
       ) : (
         <div>
-          {groupByDate(shown).map(group => (
+          {groupByDate(shown).map((group, gi) => (
             <div key={group.label}>
-              <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-4 pb-2 first:pt-0">
+              <p className={`text-xs font-bold text-text-sub uppercase tracking-wider px-1 pb-2 ${gi === 0 ? 'pt-1' : 'pt-6'}`}>
                 {group.label}
               </p>
               <div className="space-y-3">

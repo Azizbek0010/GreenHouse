@@ -406,9 +406,11 @@ export default function KassaTarix() {
 
           {sotuvFeed.length === 0 ? <EmptyState text="Hozircha sotuv yo'q" /> : (
             <div>
-              {groupByDate(sotuvFeed, it => it._date).map(group => (
+              {groupByDate(sotuvFeed, it => it._date).map((group, gi) => (
                 <div key={group.label}>
-                  <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-7 pb-2.5 first:pt-0">{group.label}</p>
+                  {/* Guruh sarlavhasi orasidagi masofa: first:pt-0 bu yerda ishlamaydi —
+                      har bir sarlavha o'z div ining birinchi bolasi, shuning uchun indeks bo'yicha */}
+                  <p className={`text-xs font-bold text-text-sub uppercase tracking-wider px-1 pb-2.5 ${gi === 0 ? 'pt-1' : 'pt-7'}`}>{group.label}</p>
                   <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden divide-y divide-separator">
                     {group.items.map(it => it._kind === 'sotuv' ? (
                       <div key={it._id} className="p-4">
@@ -512,9 +514,9 @@ export default function KassaTarix() {
           <EmptyState text={sanaF.active ? "Bu sanada atxod yo'q" : "Hozircha atxod yo'q"} />
         ) : (
           <div>
-            {groupByDate(atxodShown).map(group => (
+            {groupByDate(atxodShown).map((group, gi) => (
               <div key={group.label}>
-                <p className="text-xs font-bold text-text-sub uppercase tracking-wider px-1 pt-7 pb-2.5 first:pt-0">
+                <p className={`text-xs font-bold text-text-sub uppercase tracking-wider px-1 pb-2.5 ${gi === 0 ? 'pt-1' : 'pt-7'}`}>
                   {group.label}
                 </p>
                 <div className="bg-ccard border border-cborder rounded-2xl overflow-hidden divide-y divide-separator">
