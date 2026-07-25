@@ -142,12 +142,12 @@ export default function TolovField({
         <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">{label}</p>
       )}
 
-      {/* Rejim tugmasi */}
+      {/* Rejim tugmasi. py-1.5 — bosish maydoni 34px edi, telefon uchun kam
+          (kerak 44px); endi 46px. */}
       <button
         type="button"
         onClick={() => set({ aralash: !t.aralash })}
         aria-pressed={t.aralash}
-        // py-1.5 — bosish maydoni 34px edi, telefon uchun kam (kerak 44px).
         className="flex items-center gap-2.5 w-full text-left py-1.5 mb-2"
       >
         <span
