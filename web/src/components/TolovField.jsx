@@ -79,9 +79,11 @@ function SummaCard({ usul, value, onChange }) {
   const Icon   = usul.icon
   const bor    = value > 0
   const naqtmi = usul.key === 'naqt'
+  // label — butun karta bosiladigan maydon bo'lsin. Input o'zi atigi 112x28px,
+  // telefonda bunga tushish qiyin; endi 343x66px karta ham fokus beradi.
   return (
-    <div
-      className={`flex items-center gap-3 px-3.5 py-3 mb-2 bg-ccard border border-cborder rounded-2xl border-l-4 transition-colors ${
+    <label
+      className={`flex items-center gap-3 px-3.5 py-3 mb-2 bg-ccard border border-cborder rounded-2xl border-l-4 transition-colors cursor-text ${
         bor ? (naqtmi ? 'border-l-cgreen' : 'border-l-primary') : 'border-l-cborder'
       }`}
     >
@@ -110,7 +112,7 @@ function SummaCard({ usul, value, onChange }) {
         />
         <span className="text-xs text-text-sub font-semibold shrink-0">so'm</span>
       </div>
-    </div>
+    </label>
   )
 }
 
@@ -145,7 +147,8 @@ export default function TolovField({
         type="button"
         onClick={() => set({ aralash: !t.aralash })}
         aria-pressed={t.aralash}
-        className="flex items-center gap-2.5 w-full text-left mb-3"
+        // py-1.5 — bosish maydoni 34px edi, telefon uchun kam (kerak 44px).
+        className="flex items-center gap-2.5 w-full text-left py-1.5 mb-2"
       >
         <span
           className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
