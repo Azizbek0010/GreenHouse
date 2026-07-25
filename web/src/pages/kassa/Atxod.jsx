@@ -222,7 +222,7 @@ export default function KassaAtxod() {
             <p className="text-sm text-cred font-semibold">Jami yo'qotish</p>
             <p className="text-xs text-cred/70 mt-0.5">{items.length} tur · {totalQty} ta gul</p>
           </div>
-          <p className="text-2xl font-bold text-cred">{money(total)} <span className="text-base font-medium">s</span></p>
+          <p className="text-2xl font-bold text-cred">{money(total)} <span className="text-base font-medium">so'm</span></p>
         </div>
       )}
 

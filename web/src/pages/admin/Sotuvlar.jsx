@@ -53,7 +53,7 @@ export default function AdminSotuvlar() {
           <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">Umumiy tushum</p>
           <p className="text-xs text-white/60 mt-0.5">{sotuvlar.length} ta sotuv</p>
         </div>
-        <p className="text-3xl font-bold tracking-tight">{money(total)} <span className="text-base font-medium text-white/70">s</span></p>
+        <p className="text-3xl font-bold tracking-tight">{money(total)} <span className="text-base font-medium text-white/70">so'm</span></p>
       </div>
 
       <ErrorMsg msg={error} onClose={() => setError('')} />

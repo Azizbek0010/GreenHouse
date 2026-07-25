@@ -194,7 +194,7 @@ export default function QarzSotuv() {
             <p className="text-sm text-corange font-semibold">Qarz summasi</p>
             <p className="text-xs text-corange/70 mt-0.5">{items.length} tur · {totalQty} ta gul</p>
           </div>
-          <p className="text-2xl font-bold text-corange">{money(total)} <span className="text-base font-medium">s</span></p>
+          <p className="text-2xl font-bold text-corange">{money(total)} <span className="text-base font-medium">so'm</span></p>
         </div>
       )}
 

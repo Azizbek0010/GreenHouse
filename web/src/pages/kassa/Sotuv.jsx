@@ -269,7 +269,7 @@ export default function Sotuv() {
             <p className="text-sm text-primary font-semibold">Jami summa</p>
             <p className="text-xs text-primary/70 mt-0.5">{items.length} tur · {totalQty} ta gul</p>
           </div>
-          <p className="text-2xl font-bold text-primary">{money(total)} <span className="text-base font-medium">s</span></p>
+          <p className="text-2xl font-bold text-primary">{money(total)} <span className="text-base font-medium">so'm</span></p>
         </div>
       )}
 
