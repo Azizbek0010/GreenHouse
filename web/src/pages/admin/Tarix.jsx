@@ -68,7 +68,10 @@ function QarzSearchSort({ search, onSearch, sort, onSort }) {
     </div>
   )
 }
+// totalKey — maydon nomi yoki funksiya. Funksiya usul filtri uchun kerak:
+// kun yig'indisi ham satrlar bilan bir xil qoidada hisoblansin.
 function groupByDate(items, totalKey) {
+  const qiymat = totalKey && (typeof totalKey === 'function' ? totalKey : it => it[totalKey])
   const groups = [], seen = {}
   for (const item of items) {
     const key = dateKey(item.createdAt)
@@ -77,7 +80,7 @@ function groupByDate(items, totalKey) {
       groups.push(seen[key])
     }
     seen[key].items.push(item)
-    if (totalKey) seen[key].total += item[totalKey] || 0
+    if (qiymat) seen[key].total += qiymat(item) || 0
   }
   return groups
 }
@@ -100,6 +103,24 @@ const STATUS_LABEL = { pending: 'Kutilmoqda', approved: 'Tasdiqlandi', rejected:
 // yozuvUsullari / usulSummalar — TolovField dan olinadi (kassa Tarixi bilan
 // bitta manba). To'lanmagan qarzning usuli yo'q, shuning uchun naqt/karta
 // filtrida ko'rinmaydi — bu xatti-harakat saqlanadi.
+
+// O'ng tomondagi summa. Filtr yoqilganda faqat o'sha usulning qismi
+// ko'rsatiladi, to'liq summa esa pastda qoladi. Aks holda sarlavhadagi
+// "faqat karta qismi" jamisi satrlar yig'indisiga to'g'ri kelmaydi.
+// Kassa Tarixidagi YozuvSummasi bilan bir xil qoida.
+function YozuvSummasi({ yozuv, usulF, rang }) {
+  const toliq = yozuv.totalPrice || 0
+  const qism  = usulF === 'hammasi' ? toliq : usulSummalar(yozuv)[usulF]
+  return (
+    <div className="text-right shrink-0">
+      <p className={`text-lg font-bold ${rang}`}>{money(qism)}</p>
+      <p className="text-xs text-text-sub">so'm</p>
+      {usulF !== 'hammasi' && qism !== toliq && (
+        <p className="text-[11px] text-text-sub/70 mt-0.5">{money(toliq)} dan</p>
+      )}
+    </div>
+  )
+}
 
 // ── Sotuvlar tab ──────────────────────────────────────────────────────
 // Oddiy sotuvlar + qarzga sotilganlar birga. Qarz ham sotuv: gul o'sha kuni ketgan,
@@ -180,7 +201,9 @@ function SotuvlarTab({ list, qarzlar = [] }) {
 
       {shown.length === 0 ? <EmptyState text="Sotuv yo'q" /> : (
         <div>
-          {groupByDate(shown, 'totalPrice').map((group, gi) => (
+          {groupByDate(shown, it =>
+            usulF === 'hammasi' ? it.totalPrice : usulSummalar(it)[usulF]
+          ).map((group, gi) => (
             <div key={group.label}>
               <DateHeader label={group.label} right={`${money(group.total)} so'm`} first={gi === 0} />
               <div className="space-y-3">
@@ -202,12 +225,8 @@ function SotuvlarTab({ list, qarzlar = [] }) {
                             {soat(it.createdAt)} <QoldaBadge show={it.backfill} />
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-lg font-bold ${it.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'}`}>
-                            {money(it.totalPrice)}
-                          </p>
-                          <p className="text-xs text-text-sub">so'm</p>
-                        </div>
+                        <YozuvSummasi yozuv={it} usulF={usulF}
+                          rang={it.holat === 'nuqsonli' ? 'text-corange' : 'text-cgreen'} />
                       </div>
                     </div>
                   </button>
@@ -230,10 +249,8 @@ function SotuvlarTab({ list, qarzlar = [] }) {
                           {soat(it.createdAt)} <QoldaBadge show={it.backfill} />
                         </p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-lg font-bold ${it.isPaid ? 'text-cgreen' : 'text-corange'}`}>{money(it.totalPrice)}</p>
-                        <p className="text-xs text-text-sub">so'm</p>
-                      </div>
+                      <YozuvSummasi yozuv={it} usulF={usulF}
+                        rang={it.isPaid ? 'text-cgreen' : 'text-corange'} />
                     </div>
                   </button>
                 ))}

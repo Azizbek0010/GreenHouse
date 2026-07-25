@@ -92,6 +92,24 @@ const STATUS_MAP  = {
 }
 
 // ── To'lov (payment) modal ─────────────────────────────────────────
+// O'ng tomondagi summa. Usul filtri yoqilganda faqat o'sha usulning qismi
+// ko'rsatiladi: sarlavhada "faqat karta qismi" deb turib, satrlarda to'liq
+// summalarni ko'rsatish kassirni chalg'itardi — satrlarni qo'shsa,
+// sarlavhadagi jamiga umuman to'g'ri kelmasdi.
+function YozuvSummasi({ yozuv, usulF, rang }) {
+  const toliq = yozuv.totalPrice || 0
+  const qism  = usulF === 'hammasi' ? toliq : usulSummalar(yozuv)[usulF]
+  return (
+    <div className="text-right shrink-0">
+      <p className={`text-base font-bold ${rang}`}>{money(qism)}</p>
+      <p className="text-xs text-text-sub">so'm</p>
+      {usulF !== 'hammasi' && qism !== toliq && (
+        <p className="text-[11px] text-text-sub/70 mt-0.5">{money(toliq)} dan</p>
+      )}
+    </div>
+  )
+}
+
 function TolovModal({ qarz, onClose, onPaid }) {
   const [amount, setAmount] = useState('')
   const [sana, setSana]     = useState('')   // bo'sh = bugun
@@ -453,10 +471,7 @@ export default function KassaTarix() {
                             <p className="text-xs text-text-sub mt-1">{it.qty} ta · {money(it.pricePerUnit)} so'm/dona</p>
                             <p className="text-xs text-text-sub/60 mt-0.5">{soat(it.createdAt)}</p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-base font-bold text-cgreen">{money(it.totalPrice)}</p>
-                            <p className="text-xs text-text-sub">so'm</p>
-                          </div>
+                          <YozuvSummasi yozuv={it} usulF={usulF} rang="text-cgreen" />
                         </div>
                       </div>
                     ) : (
@@ -474,11 +489,9 @@ export default function KassaTarix() {
                             <p className="text-xs text-text-sub mt-1">{flowersSummary(it.flowers)}</p>
                             <p className="text-xs text-text-sub/60 mt-0.5">{soat(it.createdAt)}</p>
                           </div>
-                          <div className="text-right shrink-0">
-                            {/* To'lanmagan qarz — pul hali kelmagan, shuning uchun to'q sariq */}
-                            <p className={`text-base font-bold ${it.isPaid ? 'text-cgreen' : 'text-corange'}`}>{money(it.totalPrice)}</p>
-                            <p className="text-xs text-text-sub">so'm</p>
-                          </div>
+                          {/* To'lanmagan qarz — pul hali kelmagan, shuning uchun to'q sariq */}
+                          <YozuvSummasi yozuv={it} usulF={usulF}
+                            rang={it.isPaid ? 'text-cgreen' : 'text-corange'} />
                         </div>
                       </div>
                     ))}
