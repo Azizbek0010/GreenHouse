@@ -132,6 +132,14 @@ export default function TolovField({
 
   return (
     <div className={className}>
+      {/* Bo'lim sarlavhasi — rejimdan QAT'IY NAZAR ko'rinadi. Ilgari u faqat
+          segment bilan birga chiqardi: aralash yoqilganda to'lov bloki
+          formadagi yagona sarlavhasiz bo'lim bo'lib qolardi va tugma
+          yuqoridagi kartaga "yopishib" ketardi. */}
+      {label && segmentKorinsin && (
+        <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">{label}</p>
+      )}
+
       {/* Rejim tugmasi */}
       <button
         type="button"
@@ -163,9 +171,6 @@ export default function TolovField({
       {/* Rejim o'chirilgan — segment. Yoqilganda bu tugmalar ko'rinmaydi. */}
       {!t.aralash && segmentKorinsin && (
         <>
-          {label && (
-            <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">{label}</p>
-          )}
           <div className="flex gap-1 p-1 bg-cbg border border-cborder rounded-xl">
             {USULLAR.map(u => {
               const Icon = u.icon
