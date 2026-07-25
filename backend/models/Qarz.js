@@ -12,10 +12,16 @@ const flowerSchema = new mongoose.Schema({
 // Qarzni bo'lib-bo'lib to'lash tarixi (variant A: har bir to'lov o'sha kuni daromadga tushadi)
 // usul — pul qanday kelgani. Qarzga sotishning o'zida to'lov usuli yo'q:
 // o'shanda pul kelmaydi, qarzning ma'nosi shu. Usul faqat to'lov paytida ma'lum.
+// boshlangich — pul qarz ochilgan paytning o'zida kelgan (aralash sotuv:
+// mijoz 300 lik gulni oldi, 100 karta + 100 naqt to'ladi, 100 qarz qoldi).
+// Bu flag statistika uchun kerak: aylanma (savdo) bo'linishida shu summa
+// naqt/karta ustuniga o'tadi va qarz ustunidan chiqib ketadi. Keyingi
+// to'lovlar (qarzni yopish) — boshlangich: false.
 const paymentSchema = new mongoose.Schema({
-  amount: { type: Number, required: true },
-  at:     { type: Date, default: Date.now },
-  usul:   { type: String, enum: ['naqt', 'karta', null], default: null },
+  amount:     { type: Number, required: true },
+  at:         { type: Date, default: Date.now },
+  usul:       { type: String, enum: ['naqt', 'karta', null], default: null },
+  boshlangich:{ type: Boolean, default: false },
 }, { _id: false })
 
 const qarzSchema = new mongoose.Schema({

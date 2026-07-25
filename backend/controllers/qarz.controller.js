@@ -1,5 +1,6 @@
 const Qarz = require('../models/Qarz')
 const { resolveSana, sanaFields, resolveSanaForEdit, forceCreatedAt } = require('../utils/sana')
+const { tolovBoshlangich, tolovQarz } = require('../utils/tolov')
 
 function parseFlowers(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null
@@ -47,11 +48,25 @@ exports.create = async (req, res, next) => {
 
     const totalPrice = flowers.reduce((s, f) => s + flowerTotal(f), 0)
 
+    // Boshlang'ich to'lov (ixtiyoriy): mijoz 300 lik gulni oldi, 100 karta +
+    // 100 naqt berdi, 100 qarz qoldi. Pul o'sha kuni kelgani uchun payments ga
+    // tushadi — daromad/tushum hisobi o'zgarishsiz to'g'ri ishlaydi.
+    const b = tolovBoshlangich(req.body, totalPrice)
+    if (b.error) return res.status(400).json({ message: b.error })
+
+    const at = s.createdAt || new Date()
+    const payments = [
+      ...(b.naqt  > 0 ? [{ amount: b.naqt,  at, usul: 'naqt',  boshlangich: true }] : []),
+      ...(b.karta > 0 ? [{ amount: b.karta, at, usul: 'karta', boshlangich: true }] : []),
+    ]
+
     const qarz = await Qarz.create({
       kassa: req.user.id,
       flowers,
       buyer: { name, phone },
       totalPrice,
+      payments,
+      paidAmount: b.jami,
       ...sanaFields(s),
     })
 
@@ -151,7 +166,9 @@ exports.adminUpdate = async (req, res, next) => {
         const usul = p.usul ?? null
         if (usul !== null && !['naqt', 'karta'].includes(usul))
           return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
-        payments.push({ amount, at, usul })
+        // boshlangich saqlanadi: massiv butunlay almashtiriladi, flag yo'qolsa
+        // aralash sotuv statistikada oddiy qarzga aylanib qolardi
+        payments.push({ amount, at, usul, boshlangich: !!p.boshlangich })
       }
       payments.sort((a, b) => a.at - b.at)
       qarz.payments = payments
@@ -195,15 +212,12 @@ exports.tolov = async (req, res, next) => {
     if (qarz.isPaid) return res.status(400).json({ message: 'Qarz allaqachon yopilgan' })
 
     const remaining = qarz.totalPrice - qarz.paidAmount
-    const amount = Number(req.body.amount)
-    if (!Number.isFinite(amount) || amount <= 0)
-      return res.status(400).json({ message: "To'lov summasi noto'g'ri" })
-    if (amount > remaining)
-      return res.status(400).json({ message: `To'lov qoldiqdan (${remaining}) oshib ketdi` })
 
-    const usul = req.body.usul ?? null
-    if (usul !== null && !['naqt', 'karta'].includes(usul))
-      return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
+    // Bir to'lovda ikki usul bo'lishi mumkin (100 karta + 100 naqt) — u holda
+    // payments ga ikki yozuv tushadi, har birida bitta usul. Statistika
+    // payments.usul bo'yicha guruhlaydi, bo'linish o'zi to'g'ri chiqadi.
+    const t = tolovQarz(req.body, remaining)
+    if (t.error) return res.status(400).json({ message: t.error })
 
     // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt.
     // Bu yerda sana muhim: daromad payments[].at bo'yicha hisoblanadi (stats.controller.js),
@@ -214,9 +228,9 @@ exports.tolov = async (req, res, next) => {
     if (at < qarz.createdAt)
       return res.status(400).json({ message: "To'lov sanasi qarz sanasidan oldin bo'lishi mumkin emas" })
 
-    qarz.payments.push({ amount, at, usul })
+    for (const q of t.qismlar) qarz.payments.push({ ...q, at, boshlangich: false })
     qarz.payments.sort((a, b) => a.at - b.at)
-    qarz.paidAmount += amount
+    qarz.paidAmount += t.jami
     if (qarz.paidAmount >= qarz.totalPrice) {
       qarz.isPaid = true
       qarz.paidAt = qarz.payments.at(-1).at   // eng oxirgi to'lov sanasi
@@ -227,7 +241,7 @@ exports.tolov = async (req, res, next) => {
     io.to('admin').emit('qarz_tolov', {
       kassa:  req.user.name,
       buyer:  qarz.buyer.name,
-      amount,
+      amount: t.jami,
       isPaid: qarz.isPaid,
     })
 

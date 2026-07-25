@@ -13,7 +13,7 @@ function yozuvKunlari(...royxatlar) {
     for (const it of royxat) s.add(todayLocal(new Date(it.createdAt)))
   return s
 }
-import { TolovBadge } from '../../components/TolovField'
+import { TolovBadge, TolovBadges, usulSummalar, yozuvUsullari } from '../../components/TolovField'
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
@@ -97,12 +97,9 @@ const SABAB_LABEL  = { "so'lgan": "So'lgan", nuqsonli: 'Nuqsonli', singan: 'Sing
 const STATUS_CLS   = { pending: 'bg-orange-bg text-corange', approved: 'bg-green-bg text-cgreen', rejected: 'bg-red-bg text-cred' }
 const STATUS_LABEL = { pending: 'Kutilmoqda', approved: 'Tasdiqlandi', rejected: 'Rad etildi' }
 
-// Yozuv qaysi to'lov usuliga tegishli — filtr uchun.
-// Qarz to'lanmagan bo'lsa usuli yo'q, shuning uchun naqt/karta filtrida ko'rinmaydi.
-function yozuvUsullari(it) {
-  if (it._kind === 'qarz') return [...new Set((it.payments || []).map(p => p.usul).filter(Boolean))]
-  return it.tolov ? [it.tolov] : []
-}
+// yozuvUsullari / usulSummalar — TolovField dan olinadi (kassa Tarixi bilan
+// bitta manba). To'lanmagan qarzning usuli yo'q, shuning uchun naqt/karta
+// filtrida ko'rinmaydi — bu xatti-harakat saqlanadi.
 
 // ── Sotuvlar tab ──────────────────────────────────────────────────────
 // Oddiy sotuvlar + qarzga sotilganlar birga. Qarz ham sotuv: gul o'sha kuni ketgan,
@@ -122,7 +119,10 @@ function SotuvlarTab({ list, qarzlar = [] }) {
     .filter(x => kassaF === 'hammasi' || x.kassa?.name === kassaF)
     .filter(x => usulF  === 'hammasi' || yozuvUsullari(x).includes(usulF))
 
-  const shownTotal = shown.reduce((s, x) => s + (x.totalPrice || 0), 0)
+  // Usul filtri yoqilganda yozuvning faqat o'sha usuldagi qismi qo'shiladi
+  const shownTotal = usulF === 'hammasi'
+    ? shown.reduce((s, x) => s + (x.totalPrice || 0), 0)
+    : shown.reduce((s, x) => s + usulSummalar(x)[usulF], 0)
   const sotuvSoni  = shown.filter(x => x._kind === 'sotuv').length
   const qarzSoni   = shown.filter(x => x._kind === 'qarz').length
 
@@ -138,7 +138,7 @@ function SotuvlarTab({ list, qarzlar = [] }) {
           <p className="text-xs text-white/50 mt-0.5">
             {usulF === 'hammasi'
               ? `${sotuvSoni} ta sotuv${qarzSoni > 0 ? ` + ${qarzSoni} ta qarz` : ''}`
-              : `${shown.length} ta yozuv`}
+              : `${shown.length} ta yozuv · faqat ${usulF === 'naqt' ? 'naqd' : 'karta'} qismi`}
           </p>
         </div>
         <p className="text-2xl font-bold">{money(shownTotal)} <span className="text-sm font-normal text-white/60">so'm</span></p>
@@ -195,7 +195,7 @@ function SotuvlarTab({ list, qarzlar = [] }) {
                             {it.holat === 'nuqsonli' && (
                               <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-semibold">Nuqsonli</span>
                             )}
-                            <TolovBadge value={it.tolov} />
+                            <TolovBadges yozuv={it} />
                           </div>
                           <p className="text-sm text-text-sub">{it.qty} ta × {money(it.pricePerUnit)} so'm · {it.kassa?.name || 'Kassa'}</p>
                           <p className="text-xs text-text-sub/60 mt-1 flex items-center gap-1.5">

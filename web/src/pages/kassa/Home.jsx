@@ -7,7 +7,7 @@ import { StatCard, Badge, PrimaryButton, Spinner, ErrorMsg } from '../../compone
 import { sanaLabel, soat } from '../../lib/date'
 import SavdoCard from '../../components/SavdoCard'
 import OyTaqqos from '../../components/OyTaqqos'
-import { TolovBadge } from '../../components/TolovField'
+import { TolovBadges } from '../../components/TolovField'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
 function formatBatchId(id = '') { return id.replace(/^BATCH-/, 'PARTIYA-') }
@@ -170,7 +170,7 @@ export default function KassaHome() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-ctext">{sv.flowerType} {sv.razmer}sm</p>
-                      <TolovBadge value={sv.tolov} />
+                      <TolovBadges yozuv={sv} />
                     </div>
                     <p className="text-xs text-text-sub mt-0.5">
                       {sv.qty} ta {sv.holat === 'nuqsonli' ? '· Nuqsonli' : ''}

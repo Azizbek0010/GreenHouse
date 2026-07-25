@@ -7,7 +7,7 @@ import { Spinner, ErrorMsg, OutlineButton } from '../components/ui'
 import { DeleteButton } from '../components/AdminEdit'
 import BottomModal from '../components/BottomModal'
 import QarzEditModal from '../components/QarzEditModal'
-import TolovField, { TolovBadge } from '../components/TolovField'
+import TolovField, { TolovBadge, bushTolov, tolovXato } from '../components/TolovField'
 import SanaField from '../components/SanaField'
 import { sanaSoat, sanaLabel, soat, todayLocal } from '../lib/date'
 
@@ -24,7 +24,7 @@ function kunKutdi(d) {
 function TolovModal({ qarz, onClose, onPaid }) {
   const [amount, setAmount] = useState('')
   const [sana, setSana]     = useState('')
-  const [usul, setUsul]     = useState('naqt')
+  const [usul, setUsul]     = useState(bushTolov('naqt'))
   const [paying, setPaying] = useState(false)
   const [error, setError]   = useState('')
   if (!qarz) return null
@@ -32,12 +32,25 @@ function TolovModal({ qarz, onClose, onPaid }) {
   const remaining = qarz.totalPrice - qarz.paidAmount
 
   const pay = async () => {
-    const val = num(amount)
-    if (!(val > 0))      return setError('Summani kiriting')
-    if (val > remaining) return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
+    // Aralash rejimda summa TolovField ichida kiritiladi (ikkita maydon),
+    // shuning uchun yuqoridagi umumiy summa maydoni yashiriladi.
+    if (usul.aralash) {
+      const tXato = tolovXato(remaining, usul, { qarzRuxsat: true })
+      if (tXato) return setError(tXato)
+    } else if (!(num(amount) > 0)) {
+      return setError('Summani kiriting')
+    } else if (num(amount) > remaining) {
+      return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
+    }
+
     setError(''); setPaying(true)
     try {
-      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val, usul, sana: sana || undefined })
+      await api.patch(`/api/qarz/${qarz._id}/tolov`, {
+        ...(usul.aralash
+          ? { naqtSumma: usul.naqt, kartaSumma: usul.karta }
+          : { amount: num(amount), usul: usul.usul }),
+        sana: sana || undefined,
+      })
       onPaid()
     } catch (e) { setError(e.message) }
     finally { setPaying(false) }
@@ -53,23 +66,34 @@ function TolovModal({ qarz, onClose, onPaid }) {
 
         <ErrorMsg msg={error} onClose={() => setError('')} />
 
-        <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lov summasi</p>
-        <div className="flex items-center bg-cbg border border-cborder rounded-xl px-4 py-3 mb-2">
-          <input
-            type="text" inputMode="numeric" autoFocus
-            value={fmtInput(amount)}
-            onChange={e => setAmount(e.target.value.replace(/[\s\D]/g, ''))}
-            placeholder="0"
-            className="flex-1 bg-transparent text-ctext text-lg font-semibold outline-none"
-          />
-          <span className="text-text-sub text-sm">so'm</span>
-        </div>
-        <button onClick={() => setAmount(String(remaining))}
-          className="text-xs text-primary font-semibold mb-4 hover:underline">
-          To'liq to'lash ({money(remaining)} so'm)
-        </button>
+        {!usul.aralash && (
+          <>
+            <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lov summasi</p>
+            <div className="flex items-center bg-cbg border border-cborder rounded-xl px-4 py-3 mb-2">
+              <input
+                type="text" inputMode="numeric" autoFocus
+                value={fmtInput(amount)}
+                onChange={e => setAmount(e.target.value.replace(/[\s\D]/g, ''))}
+                placeholder="0"
+                className="flex-1 bg-transparent text-ctext text-lg font-semibold outline-none"
+              />
+              <span className="text-text-sub text-sm">so'm</span>
+            </div>
+            <button onClick={() => setAmount(String(remaining))}
+              className="text-xs text-primary font-semibold mb-4 hover:underline">
+              To'liq to'lash ({money(remaining)} so'm)
+            </button>
+          </>
+        )}
 
-        <TolovField value={usul} onChange={setUsul} className="mb-4" />
+        <TolovField
+          jami={remaining}
+          value={usul}
+          onChange={setUsul}
+          qarzRuxsat
+          qoldiqMatn="Qarzda qoladi"
+          className="mb-4"
+        />
         <SanaField value={sana} onChange={setSana} label="To'lov sanasi"
           min={todayLocal(new Date(qarz.createdAt))} />
 

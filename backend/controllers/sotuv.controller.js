@@ -1,12 +1,10 @@
 const Sotuv = require('../models/Sotuv')
 const { resolveSana, sanaFields, resolveSanaForEdit, forceCreatedAt } = require('../utils/sana')
+const { tolovSotuv, teng } = require('../utils/tolov')
 
 exports.create = async (req, res, next) => {
   try {
-    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, sana, tolov } = req.body
-
-    if (tolov != null && !['naqt', 'karta'].includes(tolov))
-      return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, sana } = req.body
 
     // Ixtiyoriy sana: tanlanmasa — hozirgi vaqt
     const s = resolveSana(sana)
@@ -25,6 +23,12 @@ exports.create = async (req, res, next) => {
         return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
     }
 
+    // To'lov — totalPrice pre('save') da hisoblanadi, lekin tekshirish uchun
+    // shu yerda ham kerak: summalar jamiga teng kelishi shart
+    const totalPrice = discountN != null ? discountN : priceN * qtyN
+    const t = tolovSotuv(req.body, totalPrice)
+    if (t.error) return res.status(400).json({ message: t.error })
+
     const sotuv = await Sotuv.create({
       kassa: req.user.id,
       flowerType,
@@ -33,7 +37,9 @@ exports.create = async (req, res, next) => {
       holat,
       pricePerUnit: priceN,
       discountPrice: discountN,
-      tolov: tolov ?? null,
+      tolov:      t.tolov,
+      naqtSumma:  t.naqt,
+      kartaSumma: t.karta,
       ...sanaFields(s),
     })
 
@@ -90,13 +96,9 @@ exports.adminUpdate = async (req, res, next) => {
     const sotuv = await Sotuv.findById(req.params.id)
     if (!sotuv) return res.status(404).json({ message: 'Topilmadi' })
 
-    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice, tolov } = req.body
+    const { flowerType, razmer, qty, holat, pricePerUnit, discountPrice } = req.body
+    const oldTotal = sotuv.totalPrice   // to'lov bo'linishini tekshirish uchun kerak
 
-    if (tolov !== undefined) {
-      if (tolov !== null && !['naqt', 'karta'].includes(tolov))
-        return res.status(400).json({ message: "To'lov usuli noto'g'ri" })
-      sotuv.tolov = tolov
-    }
     if (flowerType !== undefined) {
       if (!flowerType || typeof flowerType !== 'string' || !flowerType.trim())
         return res.status(400).json({ message: "Gul turi noto'g'ri" })
@@ -133,6 +135,31 @@ exports.adminUpdate = async (req, res, next) => {
     }
     if (sotuv.discountPrice != null && sotuv.discountPrice > sotuv.pricePerUnit * sotuv.qty)
       return res.status(400).json({ message: "Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas" })
+
+    // ── To'lov bo'linishi ────────────────────────────────────────────────
+    // Yangi jami — pre('save') dagi hisob bilan bir xil bo'lishi shart
+    const newTotal = sotuv.discountPrice != null ? sotuv.discountPrice : sotuv.pricePerUnit * sotuv.qty
+
+    if (req.body.naqtSumma !== undefined || req.body.kartaSumma !== undefined || req.body.tolov !== undefined) {
+      const t = tolovSotuv(req.body, newTotal)
+      if (t.error) return res.status(400).json({ message: t.error })
+      sotuv.tolov      = t.tolov
+      sotuv.naqtSumma  = t.naqt
+      sotuv.kartaSumma = t.karta
+    } else if (!teng(newTotal, oldTotal)) {
+      // Narx yoki soni o'zgardi — eski bo'linish endi jamiga to'g'ri kelmaydi.
+      // Aralash to'lovda o'zimiz proporsiya bilan qayta taqsimlamaymiz: kassaga
+      // qancha naqd, qancha karta tushgani — haqiqiy fakt, uni to'qib bo'lmaydi.
+      if (sotuv.tolov === 'aralash')
+        return res.status(400).json({
+          message: "Summa o'zgardi — naqt va karta summalarini qaytadan kiriting",
+        })
+      if (sotuv.tolov === 'naqt' || sotuv.tolov === 'karta') {
+        sotuv.naqtSumma  = sotuv.tolov === 'naqt'  ? newTotal : 0
+        sotuv.kartaSumma = sotuv.tolov === 'karta' ? newTotal : 0
+      }
+      // tolov === null — eski "noma'lum" yozuv, tegmaymiz
+    }
 
     // Sotuv sanasi (createdAt) — immutable, save dan keyin majburlanadi
     const sanaEdit = resolveSanaForEdit(req.body.sana)

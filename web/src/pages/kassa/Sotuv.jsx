@@ -6,7 +6,8 @@ import { ErrorMsg } from '../../components/ui'
 import SanaField from '../../components/SanaField'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
 import RazmerButtons from '../../components/RazmerButtons'
-import TolovField from '../../components/TolovField'
+import TolovField, { bushTolov, tolovQoldiq, tolovPayload, tolovXato } from '../../components/TolovField'
+import { phoneDigits, formatUzPhone, phoneToliq, PHONE_XATO } from '../../lib/phone'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
 function num(s)      { return parseInt(String(s).replace(/\s/g, '')) || 0 }
@@ -100,11 +101,38 @@ function itemTotal(it) {
   return disc > 0 ? disc : orig
 }
 
+// Aralash to'lovni qatorlarga taqsimlash.
+// Kassir bo'linishni BUTUN sotuvga kiritadi ("200 dan 100 karta"), lekin har bir
+// gul turi alohida Sotuv hujjati bo'lib ketadi va backend har birida
+// naqt + karta === totalPrice ni talab qiladi. Shuning uchun karta summasi
+// qatorlar orasida ulushiga qarab bo'linadi.
+//
+// Eng katta qoldiq usuli: pastga yaxlitlashdan yo'qolgan tiyinlar kasr qoldig'i
+// eng katta bo'lgan qatorlarga bittalab qaytariladi — yig'indi aynan kiritilgan
+// summaga teng chiqadi, "1 so'm yo'qoldi" degan xato bo'lmaydi.
+function kartaTaqsim(summalar, karta) {
+  const jami = summalar.reduce((s, x) => s + x, 0)
+  if (jami <= 0) return summalar.map(() => 0)
+
+  const xom  = summalar.map(t => (t * karta) / jami)
+  const past = xom.map(Math.floor)
+  let qoldiq = Math.round(karta - past.reduce((s, x) => s + x, 0))
+
+  const tartib = xom
+    .map((v, i) => ({ i, kasr: v - Math.floor(v) }))
+    .sort((a, b) => b.kasr - a.kasr)
+
+  for (let k = 0; k < tartib.length && qoldiq > 0; k++, qoldiq--) past[tartib[k].i]++
+  return past
+}
+
 export default function Sotuv() {
   const navigate = useNavigate()
   const [items, setItems]   = useState([newItem()])
   const [sana, setSana]     = useState('')   // bo'sh = bugun
-  const [tolov, setTolov]   = useState('naqt')
+  const [tolov, setTolov]   = useState(bushTolov('naqt'))
+  const [ism, setIsm]       = useState('')   // qoldiq qarzga ketsa — majburiy
+  const [tel, setTel]       = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -114,6 +142,7 @@ export default function Sotuv() {
 
   const total    = items.reduce((s, it) => s + itemTotal(it), 0)
   const totalQty = items.reduce((s, it) => s + num(it.qty), 0)
+  const qoldiq   = tolovQoldiq(total, tolov)   // > 0 bo'lsa qarzga yoziladi
 
   const onSave = async () => {
     for (const it of items) {
@@ -124,18 +153,52 @@ export default function Sotuv() {
       if (num(it.chegirma) > 0 && num(it.chegirma) > num(it.qty) * num(it.narx))
         return setError("Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas")
     }
+    const tXato = tolovXato(total, tolov, { qarzRuxsat: true })
+    if (tXato) return setError(tXato)
+    if (qoldiq > 0) {
+      if (!ism.trim())      return setError('Qoldiq qarzga yoziladi — sotib oluvchi ismini kiriting')
+      if (!phoneToliq(tel)) return setError(PHONE_XATO)
+    }
+
     setError(''); setSaving(true)
     try {
-      await Promise.all(items.map(it => api.post('/api/sotuv', {
-        flowerType:   it.type,
-        razmer:       it.razmer,
-        qty:          num(it.qty),
-        holat:        it.holat,
-        pricePerUnit: num(it.narx),
-        discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
-        tolov,
-        sana: sana || undefined,
-      })))
+      if (qoldiq > 0) {
+        // Qoldiq bor — bu qarz. Butun sotuv BITTA Qarz hujjati bo'ladi, kelgan
+        // pul esa boshlang'ich to'lov. Gullarni ikki hujjatga bo'lib bo'lmaydi:
+        // pul bo'linadi, gul bo'linmaydi.
+        await api.post('/api/qarz', {
+          flowers: items.map(it => ({
+            type:         it.type,
+            razmer:       it.razmer,
+            qty:          num(it.qty),
+            pricePerUnit: num(it.narx),
+            discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
+          })),
+          buyerName:  ism.trim(),
+          buyerPhone: '+998' + tel,
+          naqtSumma:  tolov.naqt,
+          kartaSumma: tolov.karta,
+          sana: sana || undefined,
+        })
+      } else {
+        // To'liq to'langan. Har bir gul turi alohida Sotuv yozuvi bo'lgani uchun
+        // aralash to'lov qatorlar orasida ulushiga qarab taqsimlanadi.
+        const summalar = items.map(itemTotal)
+        const kartalar = tolov.aralash ? kartaTaqsim(summalar, tolov.karta) : null
+
+        await Promise.all(items.map((it, i) => api.post('/api/sotuv', {
+          flowerType:   it.type,
+          razmer:       it.razmer,
+          qty:          num(it.qty),
+          holat:        it.holat,
+          pricePerUnit: num(it.narx),
+          discountPrice: num(it.chegirma) > 0 ? num(it.chegirma) : undefined,
+          ...(kartalar
+            ? { kartaSumma: kartalar[i], naqtSumma: summalar[i] - kartalar[i] }
+            : tolovPayload(total, tolov)),
+          sana: sana || undefined,
+        })))
+      }
       navigate('/kassa')
     } catch (e) {
       setError(e.message)
@@ -198,10 +261,8 @@ export default function Sotuv() {
         })}
       </div>
 
-      {/* To'lov usuli — naqt yoki karta */}
-      <TolovField value={tolov} onChange={setTolov} className="mb-5" />
-
-      {/* Total */}
+      {/* Jami — to'lovdan OLDIN turadi: kassir avval summani ko'radi,
+          keyin uni bo'ladi */}
       {total > 0 && (
         <div className="bg-blue-bg border border-primary/20 rounded-2xl p-4 flex items-center justify-between mb-4">
           <div>
@@ -209,6 +270,42 @@ export default function Sotuv() {
             <p className="text-xs text-primary/70 mt-0.5">{items.length} tur · {totalQty} ta gul</p>
           </div>
           <p className="text-2xl font-bold text-primary">{money(total)} <span className="text-base font-medium">s</span></p>
+        </div>
+      )}
+
+      {/* To'lov: bitta usul yoki aralash (naqt + karta), qoldiq — qarzga */}
+      <TolovField
+        jami={total}
+        value={tolov}
+        onChange={setTolov}
+        qarzRuxsat
+        className="mb-5"
+      />
+
+      {/* Qoldiq qarzga ketadi — xaridor ma'lumoti majburiy (Qarz modeli talabi) */}
+      {qoldiq > 0 && (
+        <div className="mb-5 p-4 bg-orange-bg border border-corange/25 rounded-2xl">
+          <p className="text-xs font-bold text-corange uppercase tracking-wider mb-2.5">
+            Qarzdor — {money(qoldiq)} so'm
+          </p>
+          <input
+            type="text"
+            value={ism}
+            onChange={e => setIsm(e.target.value)}
+            placeholder="Sotib oluvchi ismi"
+            className="w-full px-3.5 py-3 mb-2 rounded-xl bg-ccard border border-cborder text-ctext text-sm outline-none focus:border-corange"
+          />
+          <div className="flex items-center w-full px-3.5 py-3 rounded-xl bg-ccard border border-cborder focus-within:border-corange">
+            <span className="text-ctext text-sm font-medium mr-1.5 shrink-0">+998</span>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={formatUzPhone(tel)}
+              onChange={e => setTel(phoneDigits(e.target.value))}
+              placeholder="00 000 00 00"
+              className="flex-1 bg-transparent text-ctext text-sm font-medium outline-none tracking-wide"
+            />
+          </div>
         </div>
       )}
 
@@ -222,7 +319,7 @@ export default function Sotuv() {
       >
         {saving
           ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          : <><Check size={18} /> Sotuvni saqlash</>
+          : <><Check size={18} /> {qoldiq > 0 ? 'Saqlash va qarzga yozish' : 'Sotuvni saqlash'}</>
         }
       </button>
       <button

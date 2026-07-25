@@ -92,10 +92,21 @@ async function calcStats(cr, kassaId = null) {
   // Variant A: qarzdan tushum — to'lov qilingan sana (payments.at) bo'yicha
   const tolovMatch = { ...(hasRange ? { 'payments.at': cr } : {}), ...byKassa }
 
-  const [sotuvAgg, atxodAgg, tolovAgg, qarzSotuvAgg] = await Promise.all([
+  const [sotuvAgg, atxodAgg, tolovAgg, qarzSotuvAgg, boshAgg] = await Promise.all([
+    // Bitta sotuv ikki usulda to'langan bo'lishi mumkin, shuning uchun `tolov`
+    // satri bo'yicha guruhlash yaramaydi — summalar maydonlardan yig'iladi.
+    // $ifNull — eski yozuvlar uchun: ularda naqtSumma yo'q, usul faqat `tolov` da.
+    // Usuli ham, summasi ham yo'q bo'lsa (eng eski yozuvlar) — "noma'lum",
+    // u pastda jami dan ayirib olinadi, shuning uchun yig'indi har doim to'g'ri.
     Sotuv.aggregate([
       { $match: sotuvMatch },
-      { $group: { _id: '$tolov', summa: { $sum: '$totalPrice' }, qty: { $sum: '$qty' } } },
+      { $group: {
+          _id: null,
+          jami:  { $sum: '$totalPrice' },
+          qty:   { $sum: '$qty' },
+          naqt:  { $sum: { $ifNull: ['$naqtSumma',  { $cond: [{ $eq: ['$tolov', 'naqt'] },  '$totalPrice', 0] }] } },
+          karta: { $sum: { $ifNull: ['$kartaSumma', { $cond: [{ $eq: ['$tolov', 'karta'] }, '$totalPrice', 0] }] } },
+      } },
     ]),
     Atxod.aggregate([
       { $match: atxodMatch },
@@ -113,17 +124,39 @@ async function calcStats(cr, kassaId = null) {
       { $match: sotuvMatch },
       { $group: { _id: null, summa: { $sum: '$totalPrice' }, qty: { $sum: { $sum: '$flowers.qty' } } } },
     ]),
+    // Aralash sotuv: qarz ochilgan paytning o'zida kelgan pul (boshlang'ich to'lov).
+    // Sana bo'yicha filtr — qarz OCHILGAN sana, chunki bu aylanma bo'linishi uchun.
+    // Bu yerda $unwind xavfsiz: payments.amount yig'iladi, totalPrice emas.
+    Qarz.aggregate([
+      { $match: sotuvMatch },
+      { $unwind: '$payments' },
+      { $match: { 'payments.boshlangich': true } },
+      { $group: { _id: '$payments.usul', summa: { $sum: '$payments.amount' } } },
+    ]),
   ])
 
-  // Eski yozuvlarda tolov/usul = null — ular "noma'lum" guruhiga tushadi
+  // Eski yozuvlarda usul = null — ular "noma'lum" guruhiga tushadi
   const pick = (rows, key) => rows.find(r => r._id === key)?.summa ?? 0
   const sum  = rows => rows.reduce((s, r) => s + r.summa, 0)
 
-  const sotuvJami   = sum(sotuvAgg)
-  const sotildi     = sotuvAgg.reduce((s, r) => s + r.qty, 0)
+  const sotuvJami   = sotuvAgg[0]?.jami  ?? 0
+  const sotuvNaqt   = sotuvAgg[0]?.naqt  ?? 0
+  const sotuvKarta  = sotuvAgg[0]?.karta ?? 0
+  // Usuli ma'lum bo'lmagan qoldiq. Ayirish orqali olinadi, alohida shart bilan
+  // emas — shunda naqt + karta + noma'lum har doim jami ga teng chiqadi.
+  const sotuvNomalum= sotuvJami - sotuvNaqt - sotuvKarta
+  const sotildi     = sotuvAgg[0]?.qty ?? 0
   const tolovJami   = sum(tolovAgg)
   const qarzSotuv   = qarzSotuvAgg[0]?.summa ?? 0
   const qarzSotuvQty= qarzSotuvAgg[0]?.qty ?? 0
+
+  // Qarz ochilganda darhol to'langan qism — aylanmada naqt/karta ustuniga o'tadi.
+  // boshJami butun boshlang'ich to'lov (usuli noma'lum bo'lgani ham): u qarz
+  // ustunidan ayiriladi, aks holda kelgan pul ham qarz bo'lib qolardi.
+  const boshNaqt    = pick(boshAgg, 'naqt')
+  const boshKarta   = pick(boshAgg, 'karta')
+  const boshNomalum = pick(boshAgg, null)
+  const boshJami    = sum(boshAgg)
 
   return {
     // Tushum — kassaga kelgan haqiqiy pul (eski xatti-harakat, o'zgarmagan)
@@ -133,22 +166,27 @@ async function calcStats(cr, kassaId = null) {
     yoqotish:     atxodAgg[0]?.yoqotish ?? 0,
     atxodQty:     atxodAgg[0]?.qty ?? 0,
 
-    // Aylanma — shu davrda sotilgani (qarzga berilgani ham kiradi)
+    // Aylanma — shu davrda sotilgani (qarzga berilgani ham kiradi).
+    // Aralash sotuvda pulning kelgan qismi naqt/karta ga, kelmagani qarz ga tushadi:
+    // 300 lik gul (100 karta + 100 naqt + 100 qarz) -> karta 100, naqt 100, qarz 100.
+    // Shu sababli qarz ustuni umumiy qarz summasi emas, sotuv paytida
+    // to'lanmagan qism. jami = naqt + karta + qarz + noma'lum bo'lib qolaveradi.
     savdo: {
       jami:    sotuvJami + qarzSotuv,
-      naqt:    pick(sotuvAgg, 'naqt'),
-      karta:   pick(sotuvAgg, 'karta'),
-      qarz:    qarzSotuv,
-      nomalum: pick(sotuvAgg, null),
+      naqt:    sotuvNaqt  + boshNaqt,
+      karta:   sotuvKarta + boshKarta,
+      qarz:    qarzSotuv - boshJami,
+      nomalum: sotuvNomalum + boshNomalum,
       gullar:  sotildi + qarzSotuvQty,
     },
-    // Tushum — qanday kelgani bo'yicha (qarz to'lovlari ham shu yerda)
+    // Tushum — qanday kelgani bo'yicha (qarz to'lovlari ham shu yerda).
+    // Boshlang'ich to'lov ham payments ichida, ya'ni bu yerga o'zi kirib keladi.
     tushum: {
       jami:    sotuvJami + tolovJami,
-      naqt:    pick(sotuvAgg, 'naqt')  + pick(tolovAgg, 'naqt'),
-      karta:   pick(sotuvAgg, 'karta') + pick(tolovAgg, 'karta'),
+      naqt:    sotuvNaqt    + pick(tolovAgg, 'naqt'),
+      karta:   sotuvKarta   + pick(tolovAgg, 'karta'),
       qarzdan: tolovJami,
-      nomalum: pick(sotuvAgg, null)    + pick(tolovAgg, null),
+      nomalum: sotuvNomalum + pick(tolovAgg, null),
     },
   }
 }

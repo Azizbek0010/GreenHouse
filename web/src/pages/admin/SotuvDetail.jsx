@@ -7,6 +7,7 @@ import { DeleteButton, Field, inputCls } from '../../components/AdminEdit'
 import BottomModal from '../../components/BottomModal'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
 import SanaTanla from '../../components/SanaTanla'
+import TolovField, { tolovPayload, tolovXato } from '../../components/TolovField'
 import { todayLocal } from '../../lib/date'
 
 function money(n) { return (n || 0).toLocaleString('ru-RU') }
@@ -44,11 +45,27 @@ export default function SotuvDetail() {
       discountPrice: sv.discountPrice != null ? String(sv.discountPrice) : '',
       sana:          d,
       origSana:      d,
+      // To'lov: yozuvdagi holat. Eski yozuvda usul yo'q (noma'lum) — o'sha holda
+      // admin tegmasa hech narsa yuborilmaydi, "noma'lum" bo'lib qolaveradi.
+      tolov: {
+        aralash: sv.tolov === 'aralash',
+        usul:    sv.tolov === 'karta' ? 'karta' : 'naqt',
+        naqt:    sv.naqtSumma  || 0,
+        karta:   sv.kartaSumma || 0,
+      },
+      tolovBor:     sv.tolov != null,   // yozuvda usul bormi
+      tolovTegildi: false,              // admin to'lovni o'zgartirdimi
     })
     setEditOpen(true)
   }
 
   async function handleSave() {
+    // Aralash to'lovda summalar jamiga aynan teng kelishi shart: sotuv to'liq
+    // to'langan yozuv, unda "qoldiq" bo'lishi mumkin emas (qoldiq — bu qarz).
+    if (form.tolov.aralash) {
+      const x = tolovXato(jamiSumma, form.tolov, { qarzRuxsat: false })
+      if (x) return setError(x)
+    }
     setSaving(true); setError('')
     try {
       const updated = await api.patch(`/api/sotuv/${id}`, {
@@ -58,6 +75,9 @@ export default function SotuvDetail() {
         holat:         form.holat,
         pricePerUnit:  Number(form.pricePerUnit),
         discountPrice: form.discountPrice === '' ? null : Number(form.discountPrice),
+        // To'lovni faqat admin tegsa yoki yozuvda usul allaqachon bor bo'lsa
+        // yuboramiz. Aks holda "noma'lum" eski yozuv jimgina naqd bo'lib qolardi.
+        ...(form.tolovTegildi || form.tolovBor ? tolovPayload(jamiSumma, form.tolov) : {}),
         // Sana faqat o'zgargan bo'lsa
         ...(form.sana !== form.origSana ? { sana: form.sana } : {}),
       })
@@ -76,6 +96,13 @@ export default function SotuvDetail() {
   }
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Yakuniy summa — pre('save') dagi hisob bilan bir xil bo'lishi shart,
+  // to'lov bo'linishi shu songa tekshiriladi
+  const jamiSumma = !form ? 0
+    : form.discountPrice !== ''
+      ? Number(form.discountPrice)
+      : Number(form.pricePerUnit || 0) * Number(form.qty || 0)
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -163,10 +190,21 @@ export default function SotuvDetail() {
               </Field>
             </div>
             <p className="text-xs text-text-sub">
-              Jami: <span className="font-semibold text-ctext">
-                {money(form.discountPrice !== '' ? Number(form.discountPrice) : Number(form.pricePerUnit || 0) * Number(form.qty || 0))} so'm
-              </span>
+              Jami: <span className="font-semibold text-ctext">{money(jamiSumma)} so'm</span>
             </p>
+
+            {/* To'lov. Aralash sotuvda narx/soni o'zgarsa summalarni qaytadan
+                kiritish kerak — backend ham shuni talab qiladi, chunki kassaga
+                qancha naqd va qancha karta tushgani haqiqiy fakt, uni
+                proporsiya bilan to'qib bo'lmaydi. */}
+            <TolovField
+              jami={jamiSumma}
+              value={form.tolov}
+              onChange={v => setForm(f => ({ ...f, tolov: v, tolovTegildi: true }))}
+              qoldiqMatn="To'lanmagan qoldiq"
+              label="To'lov usuli"
+            />
+
             <PrimaryButton title="Saqlash" onClick={handleSave} loading={saving} />
           </div>
         )}

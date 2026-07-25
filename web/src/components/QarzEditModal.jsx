@@ -44,6 +44,10 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
       amount: String(p.amount),
       at:     todayLocal(new Date(p.at)),   // kun bo'yicha (ichki kalendar)
       usul:   p.usul ?? '',                 // naqt / karta / '' (noma'lum)
+      // Sotuv paytida kelgan pul belgisi. Massiv butunlay almashtirilgani uchun
+      // uni qaytarib yubormasak, aralash sotuv statistikada oddiy qarzga
+      // aylanib qolardi (aylanma naqt/karta ustunidan qarzga o'tib ketardi).
+      boshlangich: !!p.boshlangich,
     })))
     setError('')
   }, [open, qarz])
@@ -69,7 +73,10 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
           pricePerUnit:  Number(f.pricePerUnit),
           discountPrice: f.discountPrice === '' ? null : Number(f.discountPrice),
         })),
-        payments: payments.map(p => ({ amount: Number(p.amount), at: kunToISO(p.at), usul: p.usul || null })),
+        payments: payments.map(p => ({
+          amount: Number(p.amount), at: kunToISO(p.at), usul: p.usul || null,
+          boshlangich: !!p.boshlangich,
+        })),
       })
       onSaved(updated)
       onClose()
@@ -182,7 +189,7 @@ export default function QarzEditModal({ qarz, open, onClose, onSaved, onDeleted 
               </div>
             ))}
             <button
-              onClick={() => setPayments(ps => [...ps, { amount: '', at: todayLocal(new Date()), usul: 'naqt' }])}
+              onClick={() => setPayments(ps => [...ps, { amount: '', at: todayLocal(new Date()), usul: 'naqt', boshlangich: false }])}
               className="flex items-center justify-center gap-2 w-full h-11 rounded-2xl border-2 border-dashed border-cborder text-text-sub text-sm font-medium hover:border-primary hover:text-primary transition-colors"
             >
               <Plus size={15} /> To'lov qo'shish

@@ -5,7 +5,9 @@ import { api } from '../../lib/api'
 import { Spinner, EmptyState, ErrorMsg } from '../../components/ui'
 import BottomModal from '../../components/BottomModal'
 import SanaField from '../../components/SanaField'
-import TolovField, { TolovBadge } from '../../components/TolovField'
+import TolovField, {
+  TolovBadge, TolovBadges, bushTolov, tolovXato, usulSummalar, yozuvUsullari,
+} from '../../components/TolovField'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
 import { todayLocal, sanaLabel, soat, groupByDate } from '../../lib/date'
 
@@ -32,10 +34,6 @@ function flowersSummary(flowers = []) {
 // hammasi ko'rsatiladi (naqt + karta).
 function qarzUsullari(q) {
   return [...new Set((q.payments || []).map(p => p.usul).filter(Boolean))]
-}
-// Yozuv qaysi to'lov usuliga tegishli — filtr uchun
-function yozuvUsullari(it) {
-  return it._kind === 'qarz' ? qarzUsullari(it) : (it.tolov ? [it.tolov] : [])
 }
 
 // Qarzlarni ism/telefon bo'yicha qidirish + saralash
@@ -97,7 +95,7 @@ const STATUS_MAP  = {
 function TolovModal({ qarz, onClose, onPaid }) {
   const [amount, setAmount] = useState('')
   const [sana, setSana]     = useState('')   // bo'sh = bugun
-  const [usul, setUsul]     = useState('naqt')
+  const [usul, setUsul]     = useState(bushTolov('naqt'))
   const [paying, setPaying] = useState(false)
   const [error, setError]   = useState('')
   if (!qarz) return null
@@ -105,12 +103,24 @@ function TolovModal({ qarz, onClose, onPaid }) {
   const remaining = qarz.totalPrice - qarz.paidAmount
 
   const pay = async () => {
-    const val = num(amount)
-    if (!(val > 0))          return setError('Summani kiriting')
-    if (val > remaining)     return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
+    // Aralash rejimda summalar TolovField ichida kiritiladi
+    if (usul.aralash) {
+      const tXato = tolovXato(remaining, usul, { qarzRuxsat: true })
+      if (tXato) return setError(tXato)
+    } else if (!(num(amount) > 0)) {
+      return setError('Summani kiriting')
+    } else if (num(amount) > remaining) {
+      return setError(`Qoldiqdan (${money(remaining)}) oshib ketdi`)
+    }
+
     setError(''); setPaying(true)
     try {
-      await api.patch(`/api/qarz/${qarz._id}/tolov`, { amount: val, usul, sana: sana || undefined })
+      await api.patch(`/api/qarz/${qarz._id}/tolov`, {
+        ...(usul.aralash
+          ? { naqtSumma: usul.naqt, kartaSumma: usul.karta }
+          : { amount: num(amount), usul: usul.usul }),
+        sana: sana || undefined,
+      })
       onPaid()
     } catch (e) {
       setError(e.message)
@@ -137,28 +147,39 @@ function TolovModal({ qarz, onClose, onPaid }) {
 
         <ErrorMsg msg={error} onClose={() => setError('')} />
 
-        <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lov summasi</p>
-        <div className="flex items-center bg-cbg border border-cborder rounded-xl px-4 py-3 mb-2">
-          <input
-            type="text"
-            inputMode="numeric"
-            autoFocus
-            value={fmtInput(amount)}
-            onChange={e => setAmount(e.target.value.replace(/[\s\D]/g, ''))}
-            placeholder="0"
-            className="flex-1 bg-transparent text-ctext text-lg font-semibold outline-none"
-          />
-          <span className="text-text-sub text-sm">so'm</span>
-        </div>
-        <button
-          onClick={() => setAmount(String(remaining))}
-          className="text-xs text-primary font-semibold mb-4 hover:underline"
-        >
-          To'liq to'lash ({money(remaining)} so'm)
-        </button>
+        {!usul.aralash && (
+          <>
+            <p className="text-xs font-semibold text-text-sub uppercase tracking-wider mb-2">To'lov summasi</p>
+            <div className="flex items-center bg-cbg border border-cborder rounded-xl px-4 py-3 mb-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                value={fmtInput(amount)}
+                onChange={e => setAmount(e.target.value.replace(/[\s\D]/g, ''))}
+                placeholder="0"
+                className="flex-1 bg-transparent text-ctext text-lg font-semibold outline-none"
+              />
+              <span className="text-text-sub text-sm">so'm</span>
+            </div>
+            <button
+              onClick={() => setAmount(String(remaining))}
+              className="text-xs text-primary font-semibold mb-4 hover:underline"
+            >
+              To'liq to'lash ({money(remaining)} so'm)
+            </button>
+          </>
+        )}
 
-        {/* Pul qanday keldi — naqt yoki karta */}
-        <TolovField value={usul} onChange={setUsul} className="mb-4" />
+        {/* Pul qanday keldi — bitta usul yoki ikkiga bo'lib */}
+        <TolovField
+          jami={remaining}
+          value={usul}
+          onChange={setUsul}
+          qarzRuxsat
+          qoldiqMatn="Qarzda qoladi"
+          className="mb-4"
+        />
 
         {/* To'lov sanasi — ixtiyoriy. Daromad shu sana bo'yicha hisoblanadi */}
         <SanaField
@@ -293,7 +314,13 @@ export default function KassaTarix() {
             it => it._date)
   // Umumiy savdo (aylanma) — ko'rinib turgan yozuvlar summasi, qarz ham kiradi.
   // Bu "kassaga tushgan pul" emas: qarz hali to'lanmagan bo'lishi mumkin.
-  const feedTotal   = sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
+  //
+  // Usul bo'yicha filtr yoqilganda esa yozuvning FAQAT o'sha usuldagi qismi
+  // qo'shiladi. Aks holda aralash sotuv ikkala filtrga to'liq summasi bilan
+  // kirib, naqt va karta jamlari qo'shilganda haqiqiy savdodan katta chiqardi.
+  const feedTotal = usulF === 'hammasi'
+    ? sotuvFeed.reduce((s, it) => s + (it.totalPrice || 0), 0)
+    : sotuvFeed.reduce((s, it) => s + usulSummalar(it)[usulF], 0)
   const feedSotuv   = sotuvFeed.filter(it => it._kind === 'sotuv').length
   const feedQarz    = sotuvFeed.filter(it => it._kind === 'qarz').length
 
@@ -395,7 +422,7 @@ export default function KassaTarix() {
                   {/* Aylanma: sotuv + qarz. Qarz "kassaga tushgan pul" emas — u to'lanmagan bo'lishi mumkin */}
                   {usulF === 'hammasi'
                     ? `${feedSotuv} ta sotuv${feedQarz > 0 ? ` + ${feedQarz} ta qarz` : ''}`
-                    : `${sotuvFeed.length} ta yozuv`}
+                    : `${sotuvFeed.length} ta yozuv · faqat ${usulF === 'naqt' ? 'naqd' : 'karta'} qismi`}
                 </p>
               </div>
               <p className="text-xl font-bold text-cgreen">
@@ -421,7 +448,7 @@ export default function KassaTarix() {
                               {it.holat === 'nuqsonli' && (
                                 <span className="text-xs bg-orange-bg text-corange px-2 py-0.5 rounded-full font-medium">Nuqsonli</span>
                               )}
-                              <TolovBadge value={it.tolov} />
+                              <TolovBadges yozuv={it} />
                             </div>
                             <p className="text-xs text-text-sub mt-1">{it.qty} ta · {money(it.pricePerUnit)} so'm/dona</p>
                             <p className="text-xs text-text-sub/60 mt-0.5">{soat(it.createdAt)}</p>

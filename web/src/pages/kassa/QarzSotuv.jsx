@@ -6,26 +6,12 @@ import { ErrorMsg } from '../../components/ui'
 import SanaField from '../../components/SanaField'
 import FlowerTypeSelect from '../../components/FlowerTypeSelect'
 import RazmerButtons from '../../components/RazmerButtons'
+import TolovField, { bushTolov } from '../../components/TolovField'
+import { phoneDigits, formatUzPhone, phoneToliq, PHONE_XATO } from '../../lib/phone'
 
 function money(n)    { return (n || 0).toLocaleString('ru-RU') }
 function num(s)      { return parseInt(String(s).replace(/\s/g, '')) || 0 }
 function fmtInput(s) { return s ? String(s).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '' }
-
-// Telefon: +998 dan keyingi 9 raqam. Kiritilgandan 998/+ ni tozalaydi, 9 taga cheklaydi.
-function phoneDigits(raw) {
-  let d = String(raw).replace(/\D/g, '')
-  if (d.startsWith('998')) d = d.slice(3)
-  return d.slice(0, 9)
-}
-// 9 raqamni "XX XXX XX XX" ko'rinishida chiqaradi
-function formatUzPhone(d) {
-  const p = []
-  if (d.length > 0) p.push(d.slice(0, 2))
-  if (d.length > 2) p.push(d.slice(2, 5))
-  if (d.length > 5) p.push(d.slice(5, 7))
-  if (d.length > 7) p.push(d.slice(7, 9))
-  return p.join(' ')
-}
 
 // ── One flower line item ──────────────────────────────────────────
 function FlowerRow({ item, onChange, onRemove, canRemove }) {
@@ -117,6 +103,7 @@ export default function QarzSotuv() {
   const [buyerName, setBuyerName]     = useState('')
   const [buyerPhone, setBuyerPhone]   = useState('')
   const [sana, setSana]     = useState('')   // bo'sh = bugun
+  const [bosh, setBosh]     = useState(bushTolov('naqt'))  // boshlang'ich to'lov
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -136,8 +123,17 @@ export default function QarzSotuv() {
       if (num(it.chegirma) > 0 && num(it.chegirma) > num(it.qty) * num(it.narx))
         return setError("Chegirma narxi asl narxdan yuqori bo'lishi mumkin emas")
     }
-    if (!buyerName.trim())     return setError('Sotib oluvchi ismini kiriting')
-    if (buyerPhone.length !== 9) return setError("Telefon raqami to'liq emas: +998 dan keyin 9 ta raqam")
+    if (!buyerName.trim())      return setError('Sotib oluvchi ismini kiriting')
+    if (!phoneToliq(buyerPhone)) return setError(PHONE_XATO)
+
+    // Boshlang'ich to'lov qarzning hammasini yopsa — bu qarz emas, oddiy sotuv
+    const boshJami = bosh.aralash ? bosh.naqt + bosh.karta : 0
+    if (bosh.aralash) {
+      if (boshJami <= 0)     return setError("Boshlang'ich to'lov summasini kiriting")
+      if (boshJami > total)  return setError("Boshlang'ich to'lov qarz summasidan oshib ketdi")
+      if (boshJami === total)
+        return setError("Hammasi to'langan — buni oddiy sotuv sifatida yozing")
+    }
 
     setError(''); setSaving(true)
     try {
@@ -150,6 +146,7 @@ export default function QarzSotuv() {
         buyerName:  buyerName.trim(),
         buyerPhone: '+998' + buyerPhone,
         sana:       sana || undefined,
+        ...(bosh.aralash ? { naqtSumma: bosh.naqt, kartaSumma: bosh.karta } : {}),
       })
       navigate('/kassa/tarix')
     } catch (e) {
@@ -227,6 +224,20 @@ export default function QarzSotuv() {
           />
         </div>
       </div>
+
+      {/* Boshlang'ich to'lov — ixtiyoriy. Mijoz bir qismini darhol berishi mumkin
+          (naqt va/yoki karta), qolgani qarz bo'lib qoladi. */}
+      <TolovField
+        jami={total}
+        value={bosh}
+        onChange={setBosh}
+        qarzRuxsat
+        segmentKorinsin={false}
+        rejimLabel="Boshlang'ich to'lov bor"
+        rejimHint="Bir qismi darhol to'lanadi — qolgani qarzda qoladi"
+        qoldiqMatn="Qarz bo'lib qoladi"
+        className="mb-5"
+      />
 
       {/* Sana — ixtiyoriy, eng pastda. To'lov sanasi keyin, Tarixdagi to'lov oynasida kiritiladi */}
       <SanaField value={sana} onChange={setSana} />
