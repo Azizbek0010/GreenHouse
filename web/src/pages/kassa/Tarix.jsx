@@ -9,6 +9,7 @@ import TolovField, {
   TolovBadge, TolovBadges, bushTolov, tolovXato, usulSummalar, yozuvUsullari,
 } from '../../components/TolovField'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
+import KunlikSvodka from '../../components/KunlikSvodka'
 import { todayLocal, sanaLabel, soat, groupByDate } from '../../lib/date'
 
 // Kalendarda nuqta qo'yiladigan kunlar — qaysi kunda yozuv borligi darrov ko'rinsin
@@ -290,6 +291,7 @@ export default function KassaTarix() {
   const [qarzlar, setQarzlar]   = useState([])
   const [qarzSum, setQarzSum]   = useState({ totalQarz: 0, totalPaid: 0, qoldiq: 0 })
   const [atxodlar, setAtxodlar] = useState([])
+  const [partiyalar, setPartiyalar] = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
   const [payQarz, setPayQarz]   = useState(null)
@@ -302,15 +304,17 @@ export default function KassaTarix() {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [sv, qz, ax] = await Promise.all([
+      const [sv, qz, ax, pt] = await Promise.all([
         api.get('/api/sotuv'),
         api.get('/api/qarz'),
         api.get('/api/atxod'),
+        api.get('/api/partiya'),
       ])
       setSotuvlar(sv.sotuvlar || [])
       setQarzlar(qz.qarzlar || [])
       setQarzSum({ totalQarz: qz.totalQarz || 0, totalPaid: qz.totalPaid || 0, qoldiq: qz.qoldiq || 0 })
       setAtxodlar(ax || [])
+      setPartiyalar(pt || [])
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -345,6 +349,7 @@ export default function KassaTarix() {
   // Qarz va atxod tablari — yozuv ochilgan sana bo'yicha
   const qarzShown  = sanaF.filter(qarzlar)
   const atxodShown = sanaF.filter(atxodlar)
+  const partiyaShown = sanaF.filter(partiyalar)
   const openQarz   = qarzShown.filter(q => !q.isPaid)
   const paidShown  = qarzShown.filter(q => q.isPaid)
   // Sana tanlanganida server jamlari to'g'ri kelmaydi — ko'rinib turgan yozuvlardan qayta hisoblanadi
@@ -405,9 +410,18 @@ export default function KassaTarix() {
       <SanaFilter
         f={sanaF}
         count={tab === 'sotuv' ? sotuvFeed.length : tab === 'qarz' ? qarzShown.length : atxodShown.length}
-        kunlar={yozuvKunlari(sotuvlar, qarzlar, atxodlar)}
+        kunlar={yozuvKunlari(sotuvlar, qarzlar, atxodlar, partiyalar)}
         className="mb-4"
       />
+
+      {!loading && (
+        <KunlikSvodka
+          sotuvlar={sanaF.filter(sotuvlar)}
+          qarzlar={qarzShown}
+          partiyalar={partiyaShown}
+          label={sanaF.active ? sanaF.label : 'Hammasi'}
+        />
+      )}
 
       {loading ? <Spinner /> : tab === 'sotuv' ? (
         <>

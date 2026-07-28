@@ -4,6 +4,7 @@ import { ShoppingCart, Trash2, Package, RefreshCw, ChevronDown, ChevronUp, HandC
 import { api } from '../../lib/api'
 import { Badge, Spinner, EmptyState, ErrorMsg, QoldaBadge } from '../../components/ui'
 import SanaFilter, { useSanaFilter } from '../../components/SanaFilter'
+import KunlikSvodka from '../../components/KunlikSvodka'
 import { sanaLabel, soat, dateKey, todayLocal } from '../../lib/date'
 
 // Kalendarda nuqta qo'yiladigan kunlar — qaysi kunda yozuv borligi darrov ko'rinsin
@@ -687,6 +688,15 @@ export default function AdminTarix() {
         kunlar={yozuvKunlari(sotuvlar, qarzlar, atxodlar, partiyalar)}
         className="mb-4"
       />
+
+      {!loading && (
+        <KunlikSvodka
+          sotuvlar={sotuvShown}
+          qarzlar={qarzShown}
+          partiyalar={partiyaShown}
+          label={sanaF.active ? sanaF.label : 'Hammasi'}
+        />
+      )}
 
       {loading ? <Spinner /> : (
         <>

@@ -19,6 +19,7 @@ const oyBoshi  = () => { const d = new Date(); return todayLocal(new Date(d.getF
 const PRESETS = [
   { key: 'hammasi', label: 'Hammasi', range: () => ({ from: '', to: '' }) },
   { key: 'bugun',   label: 'Bugun',   range: () => ({ from: bugun(), to: bugun() }) },
+  { key: 'kecha',   label: 'Kecha',   range: () => ({ from: kunOldin(1), to: kunOldin(1) }) },
   { key: 'hafta',   label: '7 kun',   range: () => ({ from: kunOldin(6), to: bugun() }) },
   { key: 'oy',      label: 'Shu oy',  range: () => ({ from: oyBoshi(), to: bugun() }) },
 ]
